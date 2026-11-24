@@ -108,7 +108,11 @@ try {
   await page.evaluate(() => window.__comixium.closeDialog()); await wait(500);
   await page.evaluate(() => window.__comixium.openSettings()); await wait(700);
   check('Site settings dialog (`.settings-dialog`)', await page.$('.settings-dialog'), '', 'More → Theme & content filter');
-  check('Site settings open as a bottom sheet (`.settings-dialog__panel`)', await page.evaluate(() => { const p = document.querySelector('.settings-dialog__panel'); return !!p && Math.abs(p.getBoundingClientRect().bottom - innerHeight) < 2; }), '', 'Theme & content filter sheet');
+  check('Site settings fill the page (`.settings-dialog__panel`)', await page.evaluate(() => { const p = document.querySelector('.settings-dialog__panel'); if (!p) return false; const r = p.getBoundingClientRect(); return Math.abs(r.top) < 2 && Math.abs(r.height - innerHeight) < 2; }), '', 'Theme & content filter page');
+  await page.evaluate(() => document.querySelector('.settings-advanced-row')?.click()); await wait(700);
+  check('Content preferences view has a back button (`.settings-dialog__back`)', (await lastState())?.sub === 'Content preferences', String((await lastState())?.sub), 'Content preferences title in the top bar, Back to the main settings');
+  await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
+  check('Back from Content preferences returns to the main settings', await page.$('.settings-dialog .settings-advanced-row'), '', 'Back inside Theme & content filter');
   await page.evaluate(() => window.__comixium.closeDialog()); await wait(500);
 
   // --- Series page ----------------------------------------------------------------------------

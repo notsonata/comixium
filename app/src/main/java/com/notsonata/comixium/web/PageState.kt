@@ -11,6 +11,8 @@ data class PageState(
     val isReader: Boolean,
     val auth: AuthState,
     val dialogOpen: Boolean,
+    /** Title of a view inside the site's settings (e.g. "Content preferences"), else empty. */
+    val dialogSubpage: String = "",
     val isLightTone: Boolean,
     /** CSS variable name (without dashes, camelCase as in the script) -> raw CSS value. */
     val theme: Map<String, String>,
@@ -36,6 +38,7 @@ data class PageState(
                     else -> AuthState.UNKNOWN
                 },
                 dialogOpen = o.optBoolean("dialog"),
+                dialogSubpage = o.optString("sub"),
                 isLightTone = o.optString("tone") == "light",
                 theme = theme,
             )

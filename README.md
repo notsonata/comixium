@@ -81,6 +81,10 @@ Pick Mihon instead if you want one library across many sites, chapters downloade
 
 **Updating:** install the newer APK over the old one. Login and settings are kept.
 
+**Coming from a version before 1.7.0:** uninstall it first. 1.7.0 is signed with a new key, so Android won't install it over older versions. You'll need to log in again.
+
+**Checking a download:** every APK from 1.7.0 on is signed with the certificate whose SHA-256 is `ba6780acf4966f6daa0e9829b6233eb8ac5ba153e66a3d58edb8237f7df281e9`. Android refuses updates signed with any other key.
+
 Requires Android 8.0 or newer.
 
 ## FAQ
@@ -112,7 +116,7 @@ The app hooks into parts of the site, and a daily check flags when comix changes
 <details>
 <summary><b>Where are the settings?</b></summary>
 <br>
-While reading, the gear in the reader controls opens every reader option in one sheet: tapping, volume keys, zoom, full screen, controls layout and the site's own reader settings. More → App settings has the same reader options plus home page blocks, mobile optimizations, the back animation and its speed, ad blocking, domain and cache. The site's general settings (theme, content filter) open from More → Theme & content filter, as a sheet you swipe down to close.
+While reading, the gear in the reader controls opens every reader option in one sheet: tapping, volume keys, zoom, full screen, controls layout and the site's own reader settings. More → App settings has the same reader options plus home page blocks, mobile optimizations, the back animation and its speed, ad blocking, domain and cache. The site's general settings (theme, content filter) open from More → Theme & content filter.
 </details>
 
 <details>

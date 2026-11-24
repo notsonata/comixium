@@ -59,6 +59,8 @@ class WebTab(
     var isReader by mutableStateOf(false)
         private set
     var dialogOpen by mutableStateOf(false)
+    /** See [PageState.dialogSubpage]. */
+    var dialogSubpage by mutableStateOf("")
         private set
     var error by mutableStateOf<WebError?>(null)
         private set
@@ -167,7 +169,8 @@ class WebTab(
     fun handleBack(): Boolean {
         if (dialogOpen) {
             js("window.__comixium && window.__comixium.closeDialog()")
-            dialogOpen = false
+            // From a view inside the site's settings, Back returns to the main view: still open.
+            if (dialogSubpage.isNotEmpty()) dialogSubpage = "" else dialogOpen = false
             return true
         }
         val list = webView.copyBackForwardList()
@@ -301,6 +304,7 @@ class WebTab(
         if (state.title.isNotBlank()) title = state.title
         isReader = state.isReader || Site.isReaderUrl(state.url)
         dialogOpen = state.dialogOpen
+        dialogSubpage = state.dialogSubpage
         engine.onPageState(state)
         js(engine.pagePrefsCall())
         val action = pendingAction

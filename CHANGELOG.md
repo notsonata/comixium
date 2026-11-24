@@ -2,6 +2,18 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.7.0
+
+New signing key:
+
+- Uninstall Comixium before installing this version; Android won't install it over older ones
+- Log in again afterwards, and set your app settings again
+
+Theme & content filter:
+
+- Opens as a full page instead of a bottom sheet
+- Content preferences opens as its own page; Back returns to theme and content filter
+
 ## 1.6.0
 
 Series page (mobile optimizations):
