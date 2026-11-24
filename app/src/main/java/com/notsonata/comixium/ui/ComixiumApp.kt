@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -47,6 +48,11 @@ private const val MORE_PAGE = "MORE_PAGE"
 
 @Composable
 fun ComixiumApp(engine: WebEngine) {
+    Box(Modifier.fillMaxSize()) { AppContent(engine) }
+}
+
+@Composable
+private fun AppContent(engine: WebEngine) {
     val c = LocalComixColors.current
     val context = LocalContext.current
     var selected by rememberSaveable { mutableStateOf(AppTab.HOME) }
@@ -164,14 +170,19 @@ fun ComixiumApp(engine: WebEngine) {
             if (!reader && !imeVisible) ComixBottomBar(selected, ::select)
         },
     ) { padding ->
+        // Every visited tab stays composed (hidden ones INVISIBLE) so pages survive tab switches.
+        // The visible tab is explicitly layered above the hidden ones, and native screens above
+        // all of them, so drawing and touch order never depend on the order tabs were visited.
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             visited.filter { it != AppTab.MORE }.forEach { t ->
-                WebTabView(webTab(t), engine, Modifier.fillMaxSize(), visible = t == selected && current != null)
+                val visible = t == selected && current != null
+                WebTabView(webTab(t), engine, Modifier.fillMaxSize().zIndex(if (visible) 1f else 0f), visible = visible)
             }
             if (AppTab.MORE in visited && (moreTab.isCreated || morePageOpen)) {
-                WebTabView(moreTab, engine, Modifier.fillMaxSize(), visible = selected == AppTab.MORE && morePageOpen)
+                val visible = selected == AppTab.MORE && morePageOpen
+                WebTabView(moreTab, engine, Modifier.fillMaxSize().zIndex(if (visible) 1f else 0f), visible = visible)
             }
-            if (selected == AppTab.MORE && !morePageOpen) {
+            if (selected == AppTab.MORE && !morePageOpen) Box(Modifier.fillMaxSize().zIndex(2f)) {
                 MoreScreen(
                     auth = auth,
                     domain = engine.domain,
@@ -191,7 +202,7 @@ fun ComixiumApp(engine: WebEngine) {
                     },
                 )
             }
-            if (selected.needsLogin && auth == AuthState.LOGGED_OUT) {
+            if (selected.needsLogin && auth == AuthState.LOGGED_OUT) Box(Modifier.fillMaxSize().zIndex(2f)) {
                 val from = selected
                 LoginPrompt(
                     tab = from,
@@ -203,7 +214,7 @@ fun ComixiumApp(engine: WebEngine) {
     }
 
     if (searchOpen) {
-        Box(Modifier.fillMaxSize().background(c.bg)) {
+        Box(Modifier.fillMaxSize().zIndex(3f).background(c.bg)) {
             SearchOverlay(
                 recent = engine.recentSearches,
                 onSubmit = { q ->
