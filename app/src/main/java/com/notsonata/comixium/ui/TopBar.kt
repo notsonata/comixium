@@ -1,6 +1,5 @@
 package com.notsonata.comixium.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,13 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.notsonata.comixium.R
+import com.notsonata.comixium.ui.icons.ComixiumWordmark
 import com.notsonata.comixium.ui.icons.Lucide
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.ui.theme.Poppins
@@ -72,15 +70,7 @@ fun ComixTopBar(
         }
         Box(Modifier.weight(1f)) {
             if (showBrand && !showBack) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(painterResource(R.drawable.ic_brand), contentDescription = null, modifier = Modifier.size(28.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "COMIXIUM",
-                        style = TextStyle(fontFamily = Poppins, fontWeight = FontWeight.Bold, fontSize = 19.sp, letterSpacing = 0.4.sp),
-                        color = c.textEmphasis,
-                    )
-                }
+                ComixiumWordmark(height = 24.dp)
             } else {
                 Text(
                     title,
