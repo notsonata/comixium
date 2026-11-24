@@ -2,6 +2,14 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.2.0
+
+Navigation:
+
+- Back from a series page opened from the reader returns to where the series was opened from
+- Back leaves the reader in one step instead of going through every chapter read
+- Back gesture shows a preview animation on Android 14+
+
 ## 1.1.0
 
 New look:

@@ -1,7 +1,14 @@
 package com.notsonata.comixium.ui
 
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -136,7 +143,22 @@ private fun AppContent(engine: WebEngine) {
 
     val canHandleBack = searchOpen || current?.canGoBack == true || current?.dialogOpen == true ||
         (selected == AppTab.MORE && morePageOpen) || selected != AppTab.HOME
-    BackHandler(enabled = canHandleBack) { back() }
+    // Predictive back (Android 14+): the page shrinks slightly toward the swipe while the gesture
+    // is in progress, then Back runs on release. Older versions just get the Back action.
+    var backProgress by remember { mutableFloatStateOf(0f) }
+    var backFromLeft by remember { mutableStateOf(true) }
+    PredictiveBackHandler(enabled = canHandleBack) { events ->
+        try {
+            events.collect { e ->
+                backProgress = e.progress
+                backFromLeft = e.swipeEdge == BackEventCompat.EDGE_LEFT
+            }
+            back()
+        } finally {
+            backProgress = 0f
+        }
+    }
+    val animatedBack by animateFloatAsState(backProgress, label = "predictive-back")
 
     val imeVisible = WindowInsets.isImeVisible
     Scaffold(
@@ -173,7 +195,24 @@ private fun AppContent(engine: WebEngine) {
         // Every visited tab stays composed (hidden ones INVISIBLE) so pages survive tab switches.
         // The visible tab is explicitly layered above the hidden ones, and native screens above
         // all of them, so drawing and touch order never depend on the order tabs were visited.
-        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding()
+                .graphicsLayer {
+                    val p = animatedBack
+                    if (p > 0f) {
+                        val scale = 1f - 0.08f * p
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = (if (backFromLeft) 1f else -1f) * 24.dp.toPx() * p
+                        shape = RoundedCornerShape(28.dp * p)
+                        clip = true
+                    }
+                },
+        ) {
             visited.filter { it != AppTab.MORE }.forEach { t ->
                 val visible = t == selected && current != null
                 WebTabView(webTab(t), engine, Modifier.fillMaxSize().zIndex(if (visible) 1f else 0f), visible = visible)
