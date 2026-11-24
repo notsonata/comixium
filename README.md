@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <b>comix.ws as a real Android app.</b><br>
-  The site you know, with native navigation, a better reader and no ads.
+  <b>comix as a real Android app.</b><br>
+  The site you know and love, with native navigation, a better reader and no ads.
 </p>
 
 <p align="center">
