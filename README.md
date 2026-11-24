@@ -18,6 +18,7 @@
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white">
   <img alt="No ads" src="https://img.shields.io/badge/ads-blocked-22282A?labelColor=66E8FA">
+  <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-22282A?labelColor=66E8FA">
 </p>
 
 | Home | Series | Reader | Search | More |
@@ -141,3 +142,7 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for how the app works, building, 
 - Ad and tracker list: [StevenBlack/hosts](https://github.com/StevenBlack/hosts), MIT License
 
 Licence texts are in [`third_party/`](third_party).
+
+## License
+
+Comixium's code is released under the [MIT License](LICENSE). The comix name, logo and site content belong to their owners and aren't covered by it.
