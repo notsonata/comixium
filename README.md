@@ -24,6 +24,18 @@
 | :---: | :---: | :---: | :---: | :---: |
 | <img src="docs/images/screen-home.png" width="160" alt="Home tab"> | <img src="docs/images/screen-series.png" width="160" alt="Series page"> | <img src="docs/images/screen-reader.png" width="160" alt="Full screen reader"> | <img src="docs/images/screen-search.png" width="160" alt="Search"> | <img src="docs/images/screen-more.png" width="160" alt="More tab"> |
 
+## Why Comixium
+
+[Mihon](https://mihon.app) (and Tachiyomi before it) is a great reader for pulling manga from many sites into one library. Comixium does one thing: it's comix, as an app.
+
+- **Your comix account is your library.** Follows, reading history, collections and ratings are the ones on the site, so they match comix in your browser and on any other device. Mihon keeps its own library on the phone, separate from your comix account.
+- **All of comix, not just the chapters.** Comments, ratings, collections, groups, community pages, notifications and the site's AniList and MangaBaka sync all work, because they're the site's own pages.
+- **Nothing to install or wait on.** Mihon reads each site through an extension that pulls chapters out of its pages; when the site changes, the extension can stop working until someone updates it. Comixium shows comix's own pages, so new site features show up right away and reading keeps working. Only the app's own additions (tap zones, ad clean-up, layout fixes) can go stale, and a daily check flags that.
+- **The reader you already know**, with app extras on top: tap zones, volume keys, full screen, movable controls.
+- **No ads**, with nothing to set up.
+
+Pick Mihon instead if you want one library across many sites, chapters downloaded for offline reading, or a library that doesn't need an account. Comixium needs a connection and reads from comix only.
+
 ## Features
 
 **Feels like an app, not a website**
@@ -39,7 +51,7 @@
 - Double tap to show the controls, tap the edges to turn pages or scroll, pinch to zoom
 - Tapping is fully adjustable: zones on the sides or top and bottom, three sizes, inverted, or off
 - Volume keys turn pages, normal or inverted
-- Reader controls can be moved and resized: rail, bar or minimal; top or bottom; left, center or right
+- Reader controls can be moved, resized and trimmed: rail or bar; top or bottom; left, center or right; tick which buttons show
 - Every reader option in one settings sheet, opened from the gear while reading
 
 **No ads**
