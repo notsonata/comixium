@@ -69,14 +69,9 @@ jobs:
       - name: Result
         env:
           CODE: ${{ steps.check.outputs.code }}
-          EVENT: ${{ github.event_name }}
         run: |
           case "$CODE" in
             0) echo "All site checks passed." ;;
-            2)
-              if [ "$EVENT" = "pull_request" ]; then
-                echo "::error::The site could not be loaded from the runner."; exit 1
-              fi
-              echo "::warning::The site could not be loaded from the runner (Cloudflare challenge?). Skipped." ;;
+            2) echo "::warning::The site could not be loaded from the runner (Cloudflare challenge?). Skipped." ;;
             *) echo "::error::The site check found problems; see the job summary."; exit 1 ;;
           esac

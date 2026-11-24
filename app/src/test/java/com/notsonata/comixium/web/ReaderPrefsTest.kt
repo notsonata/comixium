@@ -47,4 +47,19 @@ class ReaderPrefsTest {
         listOf("tapEdges", "tapPaged", "tapLayout", "tapZone", "invertTaps", "controlsTap", "pinchZoom", "longPress",
             "immersive", "keepOn", "volume", "layout", "x:", "y:", "size").forEach { assertTrue(it, fields.contains(it)) }
     }
+
+    @Test fun controlsShownAndMinimalMigration() {
+        val sp = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("reader-test-2", Context.MODE_PRIVATE)
+        sp.edit().putString("reader_controls_layout", "minimal").commit()
+        val p = ReaderPrefs(sp)
+        assertEquals("rail", p.controlsLayout)
+        assertFalse(p.isControlShown("home"))
+        assertTrue(p.isControlShown("chapter"))
+        p.setControlShown("home", true)
+        assertTrue(p.isControlShown("home"))
+        assertTrue(p.apply("controlsHide", "comments,autoscroll"))
+        assertFalse(p.isControlShown("comments"))
+        assertFalse(p.apply("controlsHide", "settings"))
+        assertFalse(p.apply("layout", "minimal"))
+    }
 }

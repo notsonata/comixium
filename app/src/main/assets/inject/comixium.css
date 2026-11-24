@@ -100,6 +100,10 @@ html[data-cx-y="bottom"] .rpage-floatctl {
 /* Keep clear of the site's progress bar when it sits on the same edge (it is 1.5rem thick). */
 html[data-cx-x="left"] .rpage:has(.rpage-progress--left) .rpage-floatctl { left: calc(1.5rem + 12px) !important; }
 html[data-cx-y="bottom"] .rpage:has(.rpage-progress--bottom) .rpage-floatctl { bottom: calc(1.5rem + 12px) !important; }
+html:not([data-cx-x]) .rpage:has(.rpage-progress--right) .rpage-floatctl,
+html[data-cx-x="right"] .rpage:has(.rpage-progress--right) .rpage-floatctl { right: calc(1.5rem + 12px) !important; }
+html:not([data-cx-y="bottom"])[data-cx-layout] .rpage:has(.rpage-progress--top) .rpage-floatctl,
+html:not([data-cx-y="bottom"])[data-cx-x] .rpage:has(.rpage-progress--top) .rpage-floatctl { top: calc(1.5rem + 8px) !important; }
 
 /* Layout: bar = full-width chapter switcher with a row of buttons */
 html[data-cx-layout="bar"] .rpage-floatctl {
@@ -108,8 +112,12 @@ html[data-cx-layout="bar"] .rpage-floatctl {
   transform: none;
   align-items: stretch !important;
 }
-html[data-cx-layout="bar"] .rpage:has(.rpage-progress--left) .rpage-floatctl { left: calc(1.5rem + 8px) !important; }
-html[data-cx-layout="bar"] .rpage:has(.rpage-progress--right) .rpage-floatctl { right: calc(1.5rem + 8px) !important; }
+/* Keep the bar centred on screen when the progress bar sits on either side. */
+html[data-cx-layout="bar"] .rpage:has(.rpage-progress--left) .rpage-floatctl,
+html[data-cx-layout="bar"] .rpage:has(.rpage-progress--right) .rpage-floatctl {
+  left: calc(1.5rem + 8px) !important;
+  right: calc(1.5rem + 8px) !important;
+}
 html[data-cx-layout="bar"] .rpage-floatctl__row { display: flex !important; }
 html[data-cx-layout="bar"] .rpage-floatctl__chap { flex: 1; justify-content: center; }
 html[data-cx-layout="bar"] .rpage-floatctl__col {
@@ -127,6 +135,22 @@ html[data-cx-layout="minimal"] .rpage-floatctl__col {
 }
 html[data-cx-layout="minimal"] .rpage-floatctl__col > :not([aria-label="Settings"]) {
   display: none !important;
+}
+
+/* Controls shown: data-cx-hide lists the buttons switched off (the settings button always stays). */
+html[data-cx-hide~="chapter"] .rpage-floatctl__row,
+html[data-cx-hide~="home"] .rpage-floatctl [aria-label="Home"],
+html[data-cx-hide~="series"] .rpage-floatctl [aria-label="Manga page"],
+html[data-cx-hide~="comments"] .rpage-floatctl [aria-label="Toggle comments"],
+html[data-cx-hide~="chapters"] .rpage-floatctl__col [aria-label="Chapter list"],
+html[data-cx-hide~="autoscroll"] .rpage-floatctl [aria-label*="auto-scroll"] {
+  display: none !important;
+}
+.cx-checks {
+  flex-wrap: wrap !important;
+}
+.cx-checks > .rpage-opt {
+  flex: 1 1 calc(50% - 6px) !important;
 }
 
 /* Size: large touch targets */
@@ -320,7 +344,45 @@ html[data-cx-mobile] .minidlg__panel {
   width: 100% !important;
   border-radius: 16px 16px 0 0 !important;
   max-height: 88dvh;
-  animation: cx-sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+  /* "backwards" so the slide-in doesn't pin transform afterwards: swipe-to-close needs it free. */
+  animation: cx-sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards !important;
+}
+/* Sheets close by swiping down (or Back); no close buttons. */
+html[data-cx-mobile] .minidlg .rpage-modal__close,
+html[data-cx-mobile] .rpage-cmpanel__close {
+  display: none !important;
+}
+
+/* Comments: a pull-out drawer from the bottom instead of a side panel. */
+html[data-cx-mobile] .rpage-cmpanel {
+  top: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 88dvh !important;
+  border-left: 0 !important;
+  border-radius: 16px 16px 0 0;
+  transform: translateY(105%);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 -12px 40px #0009 !important;
+}
+html[data-cx-mobile] .rpage-cmpanel.is-open {
+  transform: none;
+}
+html[data-cx-mobile] .rpage-cmpanel::before {
+  content: "";
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 2px;
+  border-radius: 2px;
+  background: rgb(var(--text-rgb) / 0.25);
+}
+html[data-cx-mobile] .rpage--cm-side-open {
+  --rpage-cm-side-w: 0px;
 }
 html[data-cx-mobile] .minidlg__panel::before {
   content: "";

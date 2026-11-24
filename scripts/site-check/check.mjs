@@ -159,6 +159,9 @@ try {
       check('Reader settings sheet reported as a popup', (await lastState())?.dialog === true, '', 'Back closes popups first');
       await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
       check('Back helper closes the settings sheet', !(await page.$('.minidlg')), '', 'Back closes popups first');
+      await page.evaluate(() => document.querySelector('.rpage-floatctl button[aria-label="Toggle comments"]')?.click()); await wait(800);
+      check('Comments panel opens as a bottom drawer (`.rpage-cmpanel`)', await page.evaluate(() => { const c = document.querySelector('.rpage-cmpanel.is-open'); if (!c) return false; const r = c.getBoundingClientRect(); return Math.abs(r.bottom - innerHeight) < 2 && Math.abs(r.width - innerWidth) < 2; }), '', 'comments drawer');
+      await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
       check('Pinch zoom enabled on chapters', await page.evaluate(() => /user-scalable=yes/.test(document.querySelector('meta[name=viewport]').content)), '', 'pinch zoom');
     }
   }
