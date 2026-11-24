@@ -1,7 +1,22 @@
 package com.notsonata.comixium.ui
 
 import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import com.notsonata.comixium.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -62,6 +77,31 @@ class ChromeScreenshotTest {
         Frame(ComixColors(), {
             ComixTopBar("", showBack = false, showBrand = true, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {}, {})
         }, AppTab.HOME) {}
+    }
+
+    @Test fun homeLightTheme() = shot("home_light", light) {
+        Frame(light, {
+            ComixTopBar("", showBack = false, showBrand = true, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {})
+        }, AppTab.HOME) {}
+    }
+
+    @Test fun launcherIcon() = shot("launcher_icon") {
+        Row(Modifier.background(Color.White).padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Launchers show the middle 72dp of the 108dp adaptive-icon canvas through their mask.
+            Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFF22282A)), contentAlignment = Alignment.Center) {
+                Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.requiredSize(108.dp))
+            }
+            Box(Modifier.size(72.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF22282A)), contentAlignment = Alignment.Center) {
+                Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.requiredSize(108.dp))
+            }
+            // Android 13+ themed icon.
+            Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFD7E3F8)), contentAlignment = Alignment.Center) {
+                Image(
+                    painterResource(R.drawable.ic_launcher_monochrome), null, Modifier.requiredSize(108.dp),
+                    colorFilter = ColorFilter.tint(Color(0xFF1B3A5C)),
+                )
+            }
+        }
     }
 
     @Test fun titlePageLoggedIn() = shot("title_logged_in") {
