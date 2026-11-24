@@ -104,6 +104,16 @@ fun MoreScreen(
                 subtitle = "While a chapter is open",
                 checked = reader.keepScreenOn, onChange = reader::updateKeepScreenOn,
             )
+            ToggleRow(
+                Lucide.Hand, "Tap edges to scroll",
+                subtitle = "Long strip: tap the left or right edge to move a screen",
+                checked = reader.tapEdges, onChange = reader::updateTapEdges,
+            )
+            ToggleRow(
+                Lucide.ZoomIn, "Pinch to zoom",
+                subtitle = "On chapter pages",
+                checked = reader.pinchZoom, onChange = reader::updatePinchZoom,
+            )
         }
         Section("SETTINGS") {
             Row(Lucide.Palette, "Theme & content filter", subtitle = "The site's own settings", onClick = onSiteSettings)
@@ -166,7 +176,7 @@ private fun Row(
 }
 
 @Composable
-private fun ToggleRow(icon: ImageVector, label: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun ToggleRow(icon: ImageVector, label: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val c = LocalComixColors.current
     Row(
         Modifier.fillMaxWidth().clickable { onChange(!checked) }.heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp),

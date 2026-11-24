@@ -132,6 +132,12 @@ class ChromeScreenshotTest {
         }, AppTab.LIBRARY) { LoginPrompt(AppTab.LIBRARY, {}, {}) }
     }
 
+    @Test fun touchControls() = shot("reader_touch_controls") {
+        Box(Modifier.fillMaxSize().background(ComixColors().surface)) {
+            TouchControls(readerPrefs(), onChanged = {}, modifier = Modifier.padding(top = 24.dp))
+        }
+    }
+
     @Test fun search() {
         val prefs = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("t", Context.MODE_PRIVATE)
         val recent = RecentSearches(prefs).apply { add("solo leveling"); add("return of the blossoming blade"); add("villainess") }

@@ -213,6 +213,14 @@ private fun AppContent(engine: WebEngine) {
         }
     }
 
+    if (engine.readerHelpOpen) {
+        ReaderHelpSheet(
+            reader = engine.reader,
+            onChanged = engine::pushReaderPrefs,
+            onDismiss = { engine.readerHelpOpen = false },
+        )
+    }
+
     if (searchOpen) {
         Box(Modifier.fillMaxSize().zIndex(3f).background(c.bg)) {
             SearchOverlay(

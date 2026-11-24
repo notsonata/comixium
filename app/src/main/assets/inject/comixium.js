@@ -101,6 +101,85 @@
     if (a && handleDownload(a)) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
 
+  // --- Chapter reader: touch controls ---------------------------------------------------------
+  // The site's reader already toggles its controls on a double tap and turns pages on edge taps in
+  // paged mode. On top of that: edge taps scroll a long strip, pinch zoom works on chapter pages,
+  // and its keyboard-shortcut help is replaced by the app's touch-controls sheet.
+  var prefs = { tapEdges: true, pinchZoom: true };
+
+  function isReader() {
+    return !!(document.body && document.body.classList.contains('rpage-body'));
+  }
+
+  /*
+   * One step forward (dir=1) or back (dir=-1) in the chapter reader, through the reader's own
+   * keyboard shortcuts so its settings apply: ArrowDown/ArrowUp scroll a long strip by the
+   * user's scroll distance; s/w turn pages in paged mode regardless of reading direction.
+   */
+  function readerStep(dir) {
+    var r = document.querySelector('.rpage');
+    if (!r) return false;
+    var paged = !r.classList.contains('rpage--long-strip');
+    var key = paged ? (dir > 0 ? 's' : 'w') : (dir > 0 ? 'ArrowDown' : 'ArrowUp');
+    var code = paged ? (dir > 0 ? 'KeyS' : 'KeyW') : key;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: key, code: code, bubbles: true, cancelable: true }));
+    return true;
+  }
+
+  // Edge taps in long-strip mode. Handled in the capture phase and stopped there, so quick
+  // repeated edge taps scroll repeatedly instead of reaching the reader as a double tap.
+  var tap = null, touches = 0;
+  function onPage(t) {
+    return t && t.closest && t.closest('.rpage-main') && !t.closest('button, a, input, textarea, select, label');
+  }
+  window.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'touch') return;
+    touches++;
+    tap = touches === 1 && onPage(e.target) ? { x: e.clientX, y: e.clientY, t: Date.now(), id: e.pointerId } : null;
+  }, true);
+  window.addEventListener('pointercancel', function (e) {
+    if (e.pointerType === 'touch') touches = Math.max(0, touches - 1);
+    tap = null;
+  }, true);
+  window.addEventListener('pointerup', function (e) {
+    if (e.pointerType !== 'touch') return;
+    touches = Math.max(0, touches - 1);
+    var t = tap;
+    tap = null;
+    if (!t || e.pointerId !== t.id || !prefs.tapEdges) return;
+    if (Math.abs(e.clientX - t.x) > 10 || Math.abs(e.clientY - t.y) > 10 || Date.now() - t.t > 350) return;
+    var r = document.querySelector('.rpage');
+    if (!r || !r.classList.contains('rpage--long-strip')) return; // paged: the reader's own edge taps apply
+    var vv = window.visualViewport;
+    var f = vv ? (e.clientX - vv.offsetLeft) / vv.width : e.clientX / window.innerWidth;
+    var dir = f < 0.25 ? -1 : f > 0.75 ? 1 : 0;
+    if (!dir) return;
+    e.stopPropagation();
+    readerStep(dir);
+  }, true);
+
+  // The reader's help button lists keyboard shortcuts; show the app's touch-controls sheet instead.
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('.rpage-floatctl button') : null;
+    if (!b) return;
+    var label = (b.getAttribute('aria-label') || b.getAttribute('title') || '').trim();
+    if (!/^help$/i.test(label)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    post({ t: 'readerHelp' });
+  }, true);
+
+  // Pinch zoom: the site locks zoom with its viewport tag; relax it on chapter pages only.
+  var originalViewport = null;
+  var ZOOMABLE = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover';
+  function applyZoom() {
+    var m = document.querySelector('meta[name="viewport"]');
+    if (!m) return;
+    if (originalViewport === null) originalViewport = m.getAttribute('content') || '';
+    var want = isReader() && prefs.pinchZoom ? ZOOMABLE : originalViewport;
+    if (m.getAttribute('content') !== want) m.setAttribute('content', want);
+  }
+
   // --- State reporting ----------------------------------------------------------------------
   var VARS = {
     bg: '--bg', bg2: '--bg-2', surface: '--surface', surface2: '--surface-2', surface3: '--surface-3',
@@ -139,6 +218,7 @@
   var last = '';
   function report() {
     if (!document.documentElement) return;
+    applyZoom();
     var s = snapshot();
     var key = JSON.stringify(s);
     if (key !== last) { last = key; post(s); }
@@ -234,18 +314,10 @@
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
       return d;
     },
-    /*
-     * One step forward (dir=1) or back (dir=-1) in the chapter reader, through the reader's own
-     * keyboard shortcuts so its settings apply: ArrowDown/ArrowUp scroll a long strip by the
-     * user's scroll distance; s/w turn pages in paged mode regardless of reading direction.
-     */
-    readerStep: function (dir) {
-      var r = document.querySelector('.rpage');
-      if (!r) return false;
-      var paged = !r.classList.contains('rpage--long-strip');
-      var key = paged ? (dir > 0 ? 's' : 'w') : (dir > 0 ? 'ArrowDown' : 'ArrowUp');
-      var code = paged ? (dir > 0 ? 'KeyS' : 'KeyW') : key;
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: key, code: code, bubbles: true, cancelable: true }));
+    readerStep: readerStep,
+    setPrefs: function (p) {
+      for (var k in p) if (Object.prototype.hasOwnProperty.call(prefs, k)) prefs[k] = !!p[k];
+      applyZoom();
       return true;
     },
     scrollByPage: function (dir) {

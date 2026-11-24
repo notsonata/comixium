@@ -200,8 +200,10 @@ class WebTab(
             useWideViewPort = true
             loadWithOverviewMode = false
             textZoom = 100
-            setSupportZoom(false)
-            builtInZoomControls = false
+            // Pinch zoom is allowed by the WebView, but the site's viewport tag still disables it on
+            // every page except chapters, where the page script relaxes it (see applyZoom).
+            setSupportZoom(true)
+            builtInZoomControls = true
             displayZoomControls = false
             allowFileAccess = false
             allowContentAccess = false
@@ -250,6 +252,10 @@ class WebTab(
     }
 
     private fun onMessage(json: String) {
+        if (PageState.type(json) == "readerHelp") {
+            engine.readerHelpOpen = true
+            return
+        }
         PageDownload.parse(json)?.let { d ->
             contextWrapper.baseContext?.let { Downloads.saveBytes(it, d.name, d.mime, d.bytes) }
             return
@@ -259,6 +265,7 @@ class WebTab(
         isReader = state.isReader || Site.isReaderUrl(state.url)
         dialogOpen = state.dialogOpen
         engine.onPageState(state)
+        if (state.isReader) js(engine.reader.pageScriptCall())
         val action = pendingAction
         if (action != null && state.auth != AuthState.UNKNOWN) {
             pendingAction = null
