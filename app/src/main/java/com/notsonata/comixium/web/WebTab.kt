@@ -283,9 +283,12 @@ class WebTab(
     }
 
     private fun onMessage(json: String) {
-        if (PageState.type(json) == "readerHelp") {
-            engine.readerHelpOpen = true
-            return
+        when (PageState.type(json)) {
+            "readerHelp" -> { engine.readerHelpOpen = true; return }
+            "pref" -> {
+                runCatching { org.json.JSONObject(json) }.getOrNull()?.let { engine.onPagePref(it.optString("key"), it.optBoolean("value")) }
+                return
+            }
         }
         PageDownload.parse(json)?.let { d ->
             contextWrapper.baseContext?.let { Downloads.saveBytes(it, d.name, d.mime, d.bytes) }
@@ -296,7 +299,7 @@ class WebTab(
         isReader = state.isReader || Site.isReaderUrl(state.url)
         dialogOpen = state.dialogOpen
         engine.onPageState(state)
-        if (state.isReader) js(engine.reader.pageScriptCall())
+        js(engine.pagePrefsCall())
         val action = pendingAction
         if (action != null && state.auth != AuthState.UNKNOWN) {
             pendingAction = null

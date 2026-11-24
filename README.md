@@ -19,6 +19,8 @@ and built-in ad blocking.
 | Reader | Chapter pages go full screen (bars hidden, swipe to peek) and keep the screen on. Touch controls: double tap the middle to show/hide the reader controls, tap the edges to turn pages (paged) or scroll a screen (long strip), pinch to zoom, volume keys to step through the chapter. The reader's help button opens a "Touch controls" sheet with all of this and its toggles. The reader's floating controls can be laid out as a rail, a full-width bar or a minimal pill, placed top/bottom and left/center/right, in normal or large size. |
 | Sharing & files | Share button on series pages; long-press any image to save (Pictures/Comixium), share or copy its link; file pickers and downloads (including the site's in-memory backup export) work. |
 | Links | comix.ws / comix.to links from other apps can open in Comixium (pick it in the "Open with" chooser). |
+| Mobile optimizations | On by default (More → Settings): touch-friendly fixes to the site's layout, such as Library folders as chips, all sort options visible, bottom-sheet dialogs, no sticky hover or desktop scrollbars, no footer or breadcrumbs. Off shows the site's own mobile layout. |
+| Home page | Announcements and the share bar have a ✕; More → Home page brings them back. |
 | Theme | Native colours follow whatever theme you pick in the site's settings (Main, Dark, Light, Custom). |
 
 Screenshots of the native parts (rendered on the JVM by Roborazzi) live in `app/screenshots/`;
