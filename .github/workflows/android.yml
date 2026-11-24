@@ -64,7 +64,9 @@ jobs:
             echo "::error::apksigner couldn't verify the release APK: $(printf '%s' "$out" | head -3 | tr '\n' ' ')"
             exit 1
           fi
-          got="$(printf '%s\n' "$out" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)"
+          # Older apksigner prints "Signer #1 certificate SHA-256 digest: ...", newer "V2 Signer: certificate
+          # SHA-256 digest: ..." (one line per scheme). Every signer listed must be the release key.
+          got="$(printf '%s\n' "$out" | sed -n 's/^.*certificate SHA-256 digest: //p' | sort -u)"
           want="$(tr -d ' \n' < app/signing/release-cert.sha256)"
           if [ "$got" != "$want" ]; then
             echo "$out"
