@@ -2,6 +2,16 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.5.0
+
+Reader:
+
+- Chapter list and settings sheets close by swiping down; no close buttons
+- Comments open as a pull-out drawer from the bottom
+- Controls bar stays centred when the progress bar is on the side
+- Choose which control buttons to show with checkboxes
+- Reading position stays put when something on the page loads or changes size
+
 ## 1.4.0
 
 Reader settings:

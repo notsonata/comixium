@@ -110,7 +110,7 @@
   var prefs = {
     tapEdges: true, tapPaged: true, tapLayout: 'sides', tapZone: 'medium', invertTaps: false, controlsTap: 'double',
     pinchZoom: true, layout: 'rail', x: 'right', y: 'top', size: 'normal',
-    volume: 'on', immersive: true, keepOn: true, longPress: true,
+    volume: 'on', immersive: true, keepOn: true, longPress: true, controlsHide: '',
     mobile: true, announce: true, share: true
   };
   var DEFAULTS = { layout: 'rail', x: 'right', y: 'top', size: 'normal' };
@@ -118,6 +118,10 @@
   try { var saved = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); if (saved) setPrefsFrom(saved); } catch (e) { /* none */ }
 
   function setPrefsFrom(p) {
+    if (p.layout === 'minimal') { // older "minimal" layout = rail with only the chapter switcher and settings
+      p.layout = 'rail';
+      if (p.controlsHide === undefined) p.controlsHide = 'home,series,comments,chapters,autoscroll';
+    }
     // Turning announcements back on also brings back the ones dismissed one by one.
     if ((p.announce === true && prefs.announce === false) || p.clearDismissed) saveDismissed([]);
     for (var k in p) {
@@ -142,6 +146,7 @@
     var root = document.documentElement;
     if (!root) return;
     setAttr(root, 'data-cx-mobile', prefs.mobile ? '' : null);
+    setAttr(root, 'data-cx-hide', prefs.controlsHide ? prefs.controlsHide.split(',').join(' ') : null);
     setAttr(root, 'data-cx-page', pageKey());
     [['layout', 'data-cx-layout'], ['x', 'data-cx-x'], ['y', 'data-cx-y'], ['size', 'data-cx-size']].forEach(function (a) {
       var v = prefs[a[0]];
@@ -251,7 +256,8 @@
     ['Long-press a page', 'longPress', [[true, 'Image menu'], [false, 'Nothing']]],
     ['Full screen', 'immersive', ON_OFF],
     ['Keep screen on', 'keepOn', ON_OFF],
-    ['Controls layout', 'layout', [['rail', 'Rail'], ['bar', 'Bar'], ['minimal', 'Minimal']]],
+    ['Controls style', 'layout', [['rail', 'Rail'], ['bar', 'Bar']]],
+    ['Controls shown', 'controlsHide', 'checks'],
     ['Controls position', 'y', [['top', 'Top'], ['bottom', 'Bottom']]],
     ['Controls side', 'x', [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]],
     ['Controls size', 'size', [['normal', 'Normal'], ['large', 'Large']]]
@@ -263,6 +269,7 @@
     for (var i = 0; i < SETTINGS.length; i++) {
       var key = SETTINGS[i][1];
       if (key === 'x' && prefs.layout === 'bar') continue; // the bar always spans the width
+      if (SETTINGS[i][2] === 'checks') { out += renderControlChecks(SETTINGS[i][0]); continue; }
       out += '<section class="rpage-settings__group cx-setting" data-key="' + key + '">' +
         '<h3 class="rpage-settings__title mono">' + SETTINGS[i][0] + '</h3><div class="rpage-settings__opts">';
       var opts = SETTINGS[i][2];
@@ -274,7 +281,39 @@
     }
     return out + '<p class="rpage-settings__hint">' + GESTURES_HINT + '</p>';
   }
+  // Which reader control buttons to show (the settings button always stays).
+  var CONTROL_ITEMS = [
+    ['chapter', 'Chapter switcher'], ['home', 'Home'], ['series', 'Series page'],
+    ['comments', 'Comments'], ['chapters', 'Chapter list'], ['autoscroll', 'Auto-scroll']
+  ];
+  function hiddenControls() {
+    return prefs.controlsHide ? prefs.controlsHide.split(',') : [];
+  }
+  function renderControlChecks(title) {
+    var hidden = hiddenControls();
+    var out = '<section class="rpage-settings__group cx-setting" data-key="controlsHide">' +
+      '<h3 class="rpage-settings__title mono">' + title + '</h3><div class="rpage-settings__opts cx-checks">';
+    for (var i = 0; i < CONTROL_ITEMS.length; i++) {
+      var on = hidden.indexOf(CONTROL_ITEMS[i][0]) < 0;
+      out += '<label class="rpage-opt' + (on ? ' is-on' : '') + '" data-check="' + CONTROL_ITEMS[i][0] + '">' +
+        '<span class="rpage-opt__check" aria-hidden="true">' + (on ? '\u2713' : '') + '</span><span>' + CONTROL_ITEMS[i][1] + '</span></label>';
+    }
+    return out + '</div><p class="rpage-settings__hint">The settings button always stays.</p></section>';
+  }
   function onSettingClick(e) {
+    var check = e.target.closest && e.target.closest('.cx-setting [data-check]');
+    if (check) {
+      e.preventDefault();
+      e.stopPropagation();
+      var id = check.getAttribute('data-check');
+      var hidden = hiddenControls();
+      var at = hidden.indexOf(id);
+      if (at >= 0) hidden.splice(at, 1); else hidden.push(id);
+      var v = hidden.join(',');
+      window.__comixium.setPrefs({ controlsHide: v });
+      post({ t: 'pref', key: 'controlsHide', value: v });
+      return;
+    }
     var opt = e.target.closest && e.target.closest('.cx-setting .rpage-opt');
     if (!opt) return;
     e.preventDefault();
@@ -305,6 +344,105 @@
     for (var i = 0; i < titles.length; i++) {
       if (/^hide controls$/i.test(titles[i].textContent.trim())) titles[i].parentElement.classList.add('cx-hidden');
     }
+  }
+
+  // --- Bottom sheets and the comments drawer: swipe down to close (mobile optimizations) -------
+  var drag = null;
+  function sheetFor(t) {
+    if (!prefs.mobile || !t || !t.closest) return null;
+    return t.closest('.minidlg__panel') || t.closest('.rpage-cmpanel.is-open');
+  }
+  function scrollerIn(el, sheet) {
+    for (var n = el; n && n !== sheet.parentElement; n = n.parentElement) {
+      if (n.scrollHeight > n.clientHeight + 1) {
+        var oy = window.getComputedStyle(n).overflowY;
+        if (oy === 'auto' || oy === 'scroll') return n;
+      }
+    }
+    return null;
+  }
+  document.addEventListener('touchstart', function (e) {
+    var sheet = e.touches.length === 1 ? sheetFor(e.target) : null;
+    drag = sheet ? { sheet: sheet, x0: e.touches[0].clientX, y0: e.touches[0].clientY, t0: Date.now(), dy: 0,
+      active: false, done: false, scroller: scrollerIn(e.target, sheet) } : null;
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!drag || drag.done) return;
+    var t = e.touches[0];
+    var dy = t.clientY - drag.y0, dx = t.clientX - drag.x0;
+    if (!drag.active) {
+      if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
+      // Only a downward, mostly vertical pull with nothing scrolled above it drags the sheet.
+      if (dy < 0 || Math.abs(dx) > Math.abs(dy) || (drag.scroller && drag.scroller.scrollTop > 0)) { drag.done = true; return; }
+      drag.active = true;
+      drag.y0 = t.clientY;
+      drag.t0 = Date.now();
+      drag.sheet.style.transition = 'none';
+      dy = 0;
+    }
+    drag.dy = Math.max(0, dy);
+    drag.sheet.style.transform = 'translateY(' + drag.dy + 'px)';
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', function () {
+    var d = drag;
+    drag = null;
+    if (!d || !d.active) return;
+    var h = d.sheet.getBoundingClientRect().height || 1;
+    var speed = d.dy / Math.max(1, Date.now() - d.t0);
+    d.sheet.style.transition = 'transform .18s cubic-bezier(.2,.8,.2,1)';
+    if (d.dy > h * 0.25 || speed > 0.7) {
+      d.sheet.style.transform = 'translateY(100%)';
+      setTimeout(function () {
+        window.__comixium.closeDialog();
+        setTimeout(function () { d.sheet.style.transform = ''; d.sheet.style.transition = ''; }, 300);
+      }, 170);
+    } else {
+      d.sheet.style.transform = '';
+      setTimeout(function () { d.sheet.style.transition = ''; }, 200);
+    }
+  }, { passive: true });
+
+  // --- Reading position guard (long strip) -----------------------------------------------------
+  // Keeps the page you're reading in place if the reader moves without you touching it (content
+  // loading or changing size, something taking focus). It stays out of the way while you scroll or
+  // fling, right after a chapter opens (so the site can restore your place), and during auto-scroll.
+  var lastInput = 0, chapterOpenedAt = 0, guardAnchor = null, guardUrl = '';
+  ['touchstart', 'touchmove', 'touchend', 'pointerdown', 'wheel', 'keydown'].forEach(function (type) {
+    window.addEventListener(type, function () { lastInput = Date.now(); }, { capture: true, passive: true });
+  });
+  function guardActive() {
+    var r = document.querySelector('.rpage.rpage--long-strip');
+    if (!r) return false;
+    if (location.pathname !== guardUrl) { guardUrl = location.pathname; chapterOpenedAt = Date.now(); guardAnchor = null; }
+    if (Date.now() - chapterOpenedAt < 4000 || Date.now() - lastInput < 2500) return false;
+    return !document.querySelector('.rpage-floatctl button[aria-pressed="true"]'); // auto-scroll playing
+  }
+  function pageAtCenter() {
+    var el = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return el && el.closest ? el.closest('.rpage-page') : null;
+  }
+  function saveAnchor() {
+    var pg = pageAtCenter();
+    guardAnchor = pg ? { el: pg, top: pg.getBoundingClientRect().top } : null;
+  }
+  function keepPosition() {
+    if (!guardActive()) { saveAnchor(); return; }
+    if (!guardAnchor || !guardAnchor.el.isConnected) { saveAnchor(); return; }
+    var moved = guardAnchor.el.getBoundingClientRect().top - guardAnchor.top;
+    if (Math.abs(moved) > 2) window.scrollBy(0, moved);
+  }
+  var guardFrame = 0;
+  window.addEventListener('scroll', function () {
+    if (guardFrame) return;
+    guardFrame = requestAnimationFrame(function () { guardFrame = 0; keepPosition(); });
+  }, { passive: true });
+  if (window.ResizeObserver) {
+    var sizeWatch = new ResizeObserver(function () { keepPosition(); });
+    setInterval(function () {
+      var main = document.querySelector('.rpage-main');
+      if (main && !main.__cxWatched) { main.__cxWatched = true; sizeWatch.observe(main); }
+    }, 1000);
   }
 
   // Pinch zoom: the site locks zoom with its viewport tag; relax it on chapter pages only.
