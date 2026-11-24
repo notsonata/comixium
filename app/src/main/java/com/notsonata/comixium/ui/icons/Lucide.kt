@@ -120,9 +120,6 @@ object Lucide {
     val UserPlus by lazy {
         icon("user-plus", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", circle(9f, 7f, 4f), "M19 8v6", "M22 11h-6")
     }
-    val Archive by lazy {
-        icon("archive", rect(2f, 3f, 20f, 5f, 1f), "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8", "M10 12h4")
-    }
     val Palette by lazy {
         icon(
             "palette",
@@ -175,4 +172,11 @@ object Lucide {
         )
     }
     val ZoomIn by lazy { icon("zoom-in", circle(11f, 11f, 8f), "m21 21-4.3-4.3", "M11 8v6", "M8 11h6") }
+    val Sliders by lazy {
+        icon(
+            "sliders-horizontal",
+            "M21 4h-7", "M10 4H3", "M21 12h-9", "M8 12H3", "M21 20h-5", "M12 20H3", "M14 2v4", "M8 10v4", "M16 18v4",
+        )
+    }
+    val Undo by lazy { icon("undo-2", "M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11") }
 }

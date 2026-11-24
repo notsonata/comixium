@@ -6,7 +6,7 @@ comix has no public API, and its private one is signed and encrypted by code tha
 every deploy. So Comixium doesn't use it. Each tab is a WebView showing the real site, and
 everything around the pages is native (Kotlin, Jetpack Compose):
 
-- **Shell** (`app/src/main/java/.../ui`): bottom tabs, top bar, search, More screen, reader
+- **Shell** (`app/src/main/java/.../ui`): bottom tabs, top bar, search, More and Settings screens, reader
   sheets, predictive back. Each tab keeps its own WebView and history.
 - **Web engine** (`app/src/main/java/.../web`): tab state, link policy (external links open in a
   Custom Tab only when tapped), ad blocker, comix.ws → comix.to fallback, page-level Back
@@ -88,7 +88,7 @@ Changelog style: short headed bullet lists, no first person.
 
 | Path | What it is |
 | --- | --- |
-| `app/src/main/java/.../ui` | Compose shell: tabs, top bar, search, More, reader sheets |
+| `app/src/main/java/.../ui` | Compose shell: tabs, top bar, search, More, Settings, reader sheets |
 | `app/src/main/java/.../ui/theme` | Site design tokens (colours, Poppins, JetBrains Mono) |
 | `app/src/main/java/.../web` | Web engine: tabs, Back, links, ad blocker, prefs, downloads |
 | `app/src/main/assets/inject` | Page script and stylesheet injected into comix pages |

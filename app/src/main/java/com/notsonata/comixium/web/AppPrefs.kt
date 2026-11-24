@@ -16,6 +16,13 @@ class AppPrefs(private val prefs: SharedPreferences) {
     var homeShareBar by mutableStateOf(prefs.getBoolean(KEY_SHARE, true))
         private set
 
+    /** The predictive-back preview (page shrinks and follows the swipe). App-only, not sent to pages. */
+    var backAnimation by mutableStateOf(prefs.getBoolean(KEY_BACK_ANIM, true))
+        private set
+    /** How fast the page settles after a back swipe: one of [BACK_SPEEDS]. */
+    var backSpeed by mutableStateOf(prefs.getString(KEY_BACK_SPEED, null)?.takeIf { it in BACK_SPEEDS } ?: "normal")
+        private set
+
     /** Set when announcements are switched back on, so ones dismissed with ✕ return too. */
     private var clearDismissed = false
 
@@ -26,6 +33,15 @@ class AppPrefs(private val prefs: SharedPreferences) {
         prefs.edit { putBoolean(KEY_ANNOUNCE, on) }
     }
     fun updateHomeShareBar(on: Boolean) { homeShareBar = on; prefs.edit { putBoolean(KEY_SHARE, on) } }
+    fun updateBackAnimation(on: Boolean) { backAnimation = on; prefs.edit { putBoolean(KEY_BACK_ANIM, on) } }
+    fun updateBackSpeed(v: String) {
+        if (v !in BACK_SPEEDS) return
+        backSpeed = v
+        prefs.edit { putString(KEY_BACK_SPEED, v) }
+    }
+
+    /** Milliseconds the page takes to settle once a back swipe is released. */
+    val backSettleMillis: Int get() = when (backSpeed) { "fast" -> 60; "slow" -> 220; else -> 90 }
 
     fun pageScriptFields(): String {
         val clear = clearDismissed
@@ -33,9 +49,12 @@ class AppPrefs(private val prefs: SharedPreferences) {
         return "mobile:$mobileOptimizations,announce:$homeAnnouncements,share:$homeShareBar" + if (clear) ",clearDismissed:true" else ""
     }
 
-    private companion object {
-        const val KEY_MOBILE = "mobile_optimizations"
-        const val KEY_ANNOUNCE = "home_announcements"
-        const val KEY_SHARE = "home_share_bar"
+    companion object {
+        val BACK_SPEEDS = listOf("fast", "normal", "slow")
+        private const val KEY_BACK_ANIM = "back_animation"
+        private const val KEY_BACK_SPEED = "back_speed"
+        private const val KEY_MOBILE = "mobile_optimizations"
+        private const val KEY_ANNOUNCE = "home_announcements"
+        private const val KEY_SHARE = "home_share_bar"
     }
 }

@@ -19,6 +19,9 @@ import java.net.URL
 
 /** Saving and sharing files the site hands us: downloads, generated backups, page images. */
 object Downloads {
+    /** Folder under the cache dir for images handed to the share sheet; cleared with the cache. */
+    const val SHARED_DIR = "shared"
+
 
     /** Regular http(s) downloads go to the system download manager, with the site's cookies. */
     fun enqueue(context: Context, url: String, userAgent: String?, contentDisposition: String?, mime: String?) {
@@ -128,7 +131,7 @@ object Downloads {
     }
 
     private fun cacheFile(context: Context, name: String): File {
-        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        val dir = File(context.cacheDir, SHARED_DIR).apply { mkdirs() }
         dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 24 * 3600_000L }?.forEach { it.delete() }
         return File(dir, name)
     }

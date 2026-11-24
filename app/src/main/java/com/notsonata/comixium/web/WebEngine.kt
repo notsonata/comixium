@@ -11,7 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import com.notsonata.comixium.ui.theme.ComixColors
 import com.notsonata.comixium.ui.theme.withSiteTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 
 /**
  * App-wide web state: which domain we're on, the site's current theme and login state, the ad
@@ -98,8 +102,26 @@ class WebEngine(private val app: Application) {
         }
     }
 
-    fun clearCache() {
+    /** Bytes in the app's cache folder (the WebView's HTTP cache plus shared-image copies). */
+    suspend fun cacheBytes(): Long = withContext(Dispatchers.IO) { dirSize(app.cacheDir) }
+
+    /**
+     * Clears the WebView's disk cache and the app's own cached files; returns the bytes freed.
+     * The WebView deletes its files in the background, so this waits for the size to settle.
+     */
+    suspend fun clearCache(): Long {
+        val before = cacheBytes()
         tabs.values.firstOrNull { it.isCreated }?.webView?.clearCache(true)
+        withContext(Dispatchers.IO) { File(app.cacheDir, Downloads.SHARED_DIR).deleteRecursively() }
+        var last = cacheBytes()
+        if (before < 1024) return (before - last).coerceAtLeast(0)
+        repeat(15) {
+            delay(200)
+            val now = cacheBytes()
+            if (now == last && now < before) return (before - now).coerceAtLeast(0)
+            last = now
+        }
+        return (before - last).coerceAtLeast(0)
     }
 
     /** Domains we already fell back from during this process, so a total outage can't ping-pong. */
@@ -178,6 +200,11 @@ class WebEngine(private val app: Application) {
     }
 
     companion object {
+        /** Total size of the files under [dir]; symlinks are not followed. */
+        internal fun dirSize(dir: File): Long =
+            dir.walkTopDown().onEnter { !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+                .filter { it.isFile }.sumOf { it.length() }
+
         const val HOSTS_ASSET = "adblock/hosts.txt"
         private const val KEY_DOMAIN = "domain"
         private const val KEY_THEME = "theme_vars"
