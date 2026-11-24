@@ -115,6 +115,9 @@ fun MoreScreen(
                 checked = reader.pinchZoom, onChange = reader::updatePinchZoom,
             )
         }
+        Section("READER CONTROLS") {
+            ReaderControlsSettings(reader, onChanged = {})
+        }
         Section("SETTINGS") {
             Row(Lucide.Palette, "Theme & content filter", subtitle = "The site's own settings", onClick = onSiteSettings)
             ToggleRow(

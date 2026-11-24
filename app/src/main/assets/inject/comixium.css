@@ -57,6 +57,66 @@ a[href*="utm_source=comix"] {
   display: none !important;
 }
 
+/* --- Reader controls: layout, position and size ------------------------------------------ */
+/* Chosen in the app and set on <html> by the page script. No attribute = the site's own design
+   (rail of buttons under the chapter switcher, top right, normal size). */
+
+/* Position */
+html[data-cx-x="left"] .rpage-floatctl {
+  right: auto !important;
+  left: 12px !important;
+  align-items: flex-start !important;
+}
+html[data-cx-x="center"] .rpage-floatctl {
+  right: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%);
+  align-items: center !important;
+}
+html[data-cx-y="bottom"] .rpage-floatctl {
+  top: auto !important;
+  bottom: 12px !important;
+  flex-direction: column-reverse !important;
+}
+
+/* Keep clear of the site's progress bar when it sits on the same edge (it is 1.5rem thick). */
+html[data-cx-x="left"] .rpage:has(.rpage-progress--left) .rpage-floatctl { left: calc(1.5rem + 12px) !important; }
+html[data-cx-y="bottom"] .rpage:has(.rpage-progress--bottom) .rpage-floatctl { bottom: calc(1.5rem + 12px) !important; }
+
+/* Layout: bar = full-width chapter switcher with a row of buttons */
+html[data-cx-layout="bar"] .rpage-floatctl {
+  left: 8px !important;
+  right: 8px !important;
+  transform: none;
+  align-items: stretch !important;
+}
+html[data-cx-layout="bar"] .rpage:has(.rpage-progress--left) .rpage-floatctl { left: calc(1.5rem + 8px) !important; }
+html[data-cx-layout="bar"] .rpage:has(.rpage-progress--right) .rpage-floatctl { right: calc(1.5rem + 8px) !important; }
+html[data-cx-layout="bar"] .rpage-floatctl__row { display: flex !important; }
+html[data-cx-layout="bar"] .rpage-floatctl__chap { flex: 1; justify-content: center; }
+html[data-cx-layout="bar"] .rpage-floatctl__col {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-around;
+}
+
+/* Layout: minimal = chapter switcher plus settings and help, in one row */
+html[data-cx-layout="minimal"] .rpage-floatctl { flex-direction: row !important; align-items: stretch !important; }
+html[data-cx-layout="minimal"] .rpage-floatctl__col {
+  flex-direction: row !important;
+  align-items: center;
+  padding: 0 2px !important;
+}
+html[data-cx-layout="minimal"] .rpage-floatctl__col > :not([aria-label="Settings"]):not([aria-label="Help"]) {
+  display: none !important;
+}
+
+/* Size: large touch targets */
+html[data-cx-size="large"] .rpage-floatctl__btn { width: 44px !important; height: 44px !important; }
+html[data-cx-size="large"] .rpage-floatctl__btn svg { width: 22px; height: 22px; }
+html[data-cx-size="large"] .rpage-floatctl__row { height: 44px !important; }
+html[data-cx-size="large"] .rpage-floatctl__chap { font-size: var(--text-base) !important; padding: 0 14px !important; }
+
 /* No blue tap flash; the site already styles :active states. */
 * {
   -webkit-tap-highlight-color: transparent;

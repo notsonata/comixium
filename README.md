@@ -16,7 +16,7 @@ and built-in ad blocking.
 | Search | Native field with recent searches; results open in the Browse tab (`/browse?q=`). |
 | More | Account pages, the site's Browse menu shortcuts, the site's theme/content settings, ad blocking toggle, domain switch, cache. |
 | Library / History | Show a native log-in prompt when you're logged out (the site redirects those pages). |
-| Reader | Chapter pages go full screen (bars hidden, swipe to peek) and keep the screen on. Touch controls: double tap the middle to show/hide the reader controls, tap the edges to turn pages (paged) or scroll a screen (long strip), pinch to zoom, volume keys to step through the chapter. The reader's help button opens a "Touch controls" sheet with all of this and its toggles. |
+| Reader | Chapter pages go full screen (bars hidden, swipe to peek) and keep the screen on. Touch controls: double tap the middle to show/hide the reader controls, tap the edges to turn pages (paged) or scroll a screen (long strip), pinch to zoom, volume keys to step through the chapter. The reader's help button opens a "Touch controls" sheet with all of this and its toggles. The reader's floating controls can be laid out as a rail, a full-width bar or a minimal pill, placed top/bottom and left/center/right, in normal or large size. |
 | Sharing & files | Share button on series pages; long-press any image to save (Pictures/Comixium), share or copy its link; file pickers and downloads (including the site's in-memory backup export) work. |
 | Links | comix.ws / comix.to links from other apps can open in Comixium (pick it in the "Open with" chooser). |
 | Theme | Native colours follow whatever theme you pick in the site's settings (Main, Dark, Light, Custom). |

@@ -105,7 +105,28 @@
   // The site's reader already toggles its controls on a double tap and turns pages on edge taps in
   // paged mode. On top of that: edge taps scroll a long strip, pinch zoom works on chapter pages,
   // and its keyboard-shortcut help is replaced by the app's touch-controls sheet.
-  var prefs = { tapEdges: true, pinchZoom: true };
+  var prefs = { tapEdges: true, pinchZoom: true, layout: 'rail', x: 'right', y: 'top', size: 'normal' };
+  var DEFAULTS = { layout: 'rail', x: 'right', y: 'top', size: 'normal' };
+  var PREFS_KEY = 'comixium.reader';
+  try { var saved = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); if (saved) setPrefsFrom(saved); } catch (e) { /* none */ }
+
+  function setPrefsFrom(p) {
+    for (var k in p) {
+      if (!Object.prototype.hasOwnProperty.call(prefs, k)) continue;
+      prefs[k] = typeof prefs[k] === 'boolean' ? !!p[k] : String(p[k]);
+    }
+  }
+
+  // Reader controls layout/position/size live on <html> as data-cx-* attributes (see comixium.css).
+  function applyControls() {
+    var root = document.documentElement;
+    if (!root) return;
+    [['layout', 'data-cx-layout'], ['x', 'data-cx-x'], ['y', 'data-cx-y'], ['size', 'data-cx-size']].forEach(function (a) {
+      var v = prefs[a[0]];
+      if (v === DEFAULTS[a[0]]) { if (root.hasAttribute(a[1])) root.removeAttribute(a[1]); }
+      else if (root.getAttribute(a[1]) !== v) root.setAttribute(a[1], v);
+    });
+  }
 
   function isReader() {
     return !!(document.body && document.body.classList.contains('rpage-body'));
@@ -246,6 +267,7 @@
     var root = document.documentElement, body = document.body;
     if (root && root !== watchedRoot) {
       watchedRoot = root;
+      applyControls();
       attrObserver.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-tone', 'style'] });
       addStyle();
     }
@@ -316,8 +338,10 @@
     },
     readerStep: readerStep,
     setPrefs: function (p) {
-      for (var k in p) if (Object.prototype.hasOwnProperty.call(prefs, k)) prefs[k] = !!p[k];
+      setPrefsFrom(p);
+      try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* private mode */ }
       applyZoom();
+      applyControls();
       return true;
     },
     scrollByPage: function (dir) {
