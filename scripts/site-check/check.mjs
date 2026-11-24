@@ -23,6 +23,18 @@ let blockedSection = false;
 const check = (name, ok, detail = '', affects = '') =>
   results.push({ section, name, ok: !!ok, skipped: blockedSection, detail, affects });
 const wait = ms => new Promise(r => setTimeout(r, ms));
+/** Polls fn until it returns something truthy or the time is up; returns the last value. */
+async function until(fn, ms = 8000) {
+  const end = Date.now() + ms;
+  let v = null;
+  while (!(v = await fn().catch(() => null)) && Date.now() < end) await wait(250);
+  return v;
+}
+// Cloudflare sometimes lets a page load but challenges the requests it makes for its data (lists,
+// genres). Checks that need that data are reported as skipped, not failed, once that happened.
+let dataChallenged = false;
+const checkData = (name, ok, detail = '', affects = '') =>
+  results.push({ section, name, ok: !!ok, skipped: blockedSection || (!ok && dataChallenged), detail, affects });
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
@@ -32,6 +44,10 @@ const ctx = await browser.newContext({
 await ctx.addInitScript({ content: 'window.__msgs=[];window.ComixiumNative={postMessage:function(s){window.__msgs.push(JSON.parse(s));}};' + pageScript });
 const page = await ctx.newPage();
 const errors = [];
+page.on('response', r => {
+  const h = r.headers();
+  if (h['cf-mitigated'] === 'challenge' || ([403, 503].includes(r.status()) && /cloudflare/i.test(h.server || '') && ['xhr', 'fetch'].includes(r.request().resourceType()))) dataChallenged = true;
+});
 page.on('pageerror', e => { if (/comixium/i.test(e.stack || '')) errors.push(e.message); });
 const lastState = () => page.evaluate(() => [...window.__msgs].reverse().find(m => m.t === 'state') || null);
 
@@ -109,16 +125,18 @@ try {
   await page.evaluate(() => window.__comixium.openSettings()); await wait(700);
   check('Site settings dialog (`.settings-dialog`)', await page.$('.settings-dialog'), '', 'More → Theme & content filter');
   check('Site settings fill the page (`.settings-dialog__panel`)', await page.evaluate(() => { const p = document.querySelector('.settings-dialog__panel'); if (!p) return false; const r = p.getBoundingClientRect(); return Math.abs(r.top) < 2 && Math.abs(r.height - innerHeight) < 2; }), '', 'Theme & content filter page');
-  await page.evaluate(() => document.querySelector('.settings-advanced-row')?.click()); await wait(700);
-  check('Content preferences view has a back button (`.settings-dialog__back`)', (await lastState())?.sub === 'Content preferences', String((await lastState())?.sub), 'Content preferences title in the top bar, Back to the main settings');
-  await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
-  check('Back from Content preferences returns to the main settings', await page.$('.settings-dialog .settings-advanced-row'), '', 'Back inside Theme & content filter');
+  await until(() => page.$('.settings-advanced-row'));
+  await page.evaluate(() => document.querySelector('.settings-advanced-row')?.click());
+  const sub = await until(async () => (await lastState())?.sub === 'Content preferences' && 'Content preferences');
+  checkData('Content preferences view has a back button (`.settings-dialog__back`)', sub, String((await lastState())?.sub), 'Content preferences title in the top bar, Back to the main settings');
+  await page.evaluate(() => window.__comixium.closeDialog());
+  checkData('Back from Content preferences returns to the main settings', sub && await until(() => page.$('.settings-dialog .settings-advanced-row')), '', 'Back inside Theme & content filter');
   await page.evaluate(() => window.__comixium.closeDialog()); await wait(500);
 
   // --- Series page ----------------------------------------------------------------------------
   section = 'Series page';
-  const titleHref = await page.evaluate(() => (document.querySelector('a[href^="/title/"]:not([href*="-chapter-"])') || {}).getAttribute?.('href'));
-  check('Series links look like `/title/<slug>`', titleHref && /^\/title\/[^/]+\/?$/.test(titleHref), titleHref || 'none found', 'series detection (share button)');
+  const titleHref = await until(() => page.evaluate(() => (document.querySelector('a[href^="/title/"]:not([href*="-chapter-"])') || {}).getAttribute?.('href')), 10000);
+  checkData('Series links look like `/title/<slug>`', titleHref && /^\/title\/[^/]+\/?$/.test(titleHref), titleHref || 'none found', 'series detection (share button)');
   if (titleHref) {
     await open(titleHref);
     check('Series header parts (`.mpage__hero-inner`, `.mpage__poster`, `.mpage__title-row`)', await page.$('.mpage__hero-inner .mpage__poster') && await page.$('.mpage__hero-inner .mpage__title-row'), '', 'title beside the cover');
@@ -162,7 +180,7 @@ try {
       }
       await page.evaluate(() => document.querySelector('.rpage-floatctl button[aria-label="Settings"]')?.click()); await wait(700);
       check('Reader settings open as a bottom sheet (`.minidlg`)', await page.evaluate(() => { const p = document.querySelector('.minidlg__panel'); return !!p && Math.abs(p.getBoundingClientRect().bottom - innerHeight) < 2; }), '', 'reader panels as bottom sheets');
-      check('App options inside the reader settings sheet', await page.evaluate(() => document.querySelectorAll('.rpage-settings__body #cx-reader-settings .cx-setting').length > 10), '', 'reader settings (taps, volume, controls)');
+      check('App options inside the reader settings sheet', await page.evaluate(() => document.querySelectorAll('.rpage-settings__body #cx-reader-settings .cx-row').length > 10), '', 'reader settings (taps, volume, controls)');
       check('Reader settings sheet reported as a popup', (await lastState())?.dialog === true, '', 'Back closes popups first');
       await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
       check('Back helper closes the settings sheet', !(await page.$('.minidlg')), '', 'Back closes popups first');

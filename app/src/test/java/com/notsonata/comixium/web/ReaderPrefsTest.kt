@@ -35,6 +35,18 @@ class ReaderPrefsTest {
         assertEquals("off", again.volumeMode)
     }
 
+    @Test fun volumeKeysAreTwoSwitchesInTheSheet() {
+        val p = prefs()
+        assertTrue(p.apply("volumeKeys", true))
+        assertTrue(p.apply("volumeInvert", true))
+        assertEquals("inverted", p.volumeMode)
+        assertTrue(p.apply("volumeKeys", false))
+        assertTrue(prefs().invertVolume) // switching volume keys off keeps the invert choice
+        assertEquals("off", prefs().volumeMode)
+        val fields = prefs().pageScriptFields()
+        assertTrue(fields, fields.contains("volumeKeys:false") && fields.contains("volumeInvert:true"))
+    }
+
     @Test fun rejectsUnknownKeysAndValues() {
         val p = prefs()
         assertFalse(p.apply("nope", true))
@@ -45,7 +57,7 @@ class ReaderPrefsTest {
     @Test fun pageScriptGetsEverySetting() {
         val fields = prefs().pageScriptFields()
         listOf("tapEdges", "tapPaged", "tapLayout", "tapZone", "invertTaps", "controlsTap", "pinchZoom", "longPress",
-            "immersive", "keepOn", "volume", "layout", "x:", "y:", "size").forEach { assertTrue(it, fields.contains(it)) }
+            "immersive", "keepOn", "volumeKeys", "volumeInvert", "layout", "x:", "y:", "size").forEach { assertTrue(it, fields.contains(it)) }
     }
 
     @Test fun controlsShownAndMinimalMigration() {

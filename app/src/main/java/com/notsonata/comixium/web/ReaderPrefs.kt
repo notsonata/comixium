@@ -107,6 +107,9 @@ class ReaderPrefs(private val prefs: SharedPreferences) {
             key == "tapZone" && s in listOf("small", "medium", "large") -> updateTapZone(s!!)
             key == "invertTaps" && b != null -> updateInvertTaps(b)
             key == "controlsTap" && s in listOf("double", "single", "off") -> updateControlsTap(s!!)
+            key == "volumeKeys" && b != null -> updateVolumeKeys(b)
+            key == "volumeInvert" && b != null -> updateInvertVolume(b)
+            // Older pages sent one "volume" setting.
             key == "volume" && s in listOf("on", "inverted", "off") -> { updateVolumeKeys(s != "off"); updateInvertVolume(s == "inverted") }
             key == "pinchZoom" && b != null -> updatePinchZoom(b)
             key == "longPress" && b != null -> updateLongPressMenu(b)
@@ -127,7 +130,7 @@ class ReaderPrefs(private val prefs: SharedPreferences) {
     fun pageScriptFields(): String =
         "tapEdges:$tapEdges,tapPaged:$tapPaged,tapLayout:'$tapLayout',tapZone:'$tapZone',invertTaps:$invertTaps," +
             "controlsTap:'$controlsTap',pinchZoom:$pinchZoom,longPress:$longPressMenu,immersive:$immersive," +
-            "keepOn:$keepScreenOn,volume:'$volumeMode',layout:'$controlsLayout',x:'$controlsX',y:'$controlsY'," +
+            "keepOn:$keepScreenOn,volumeKeys:$volumeKeys,volumeInvert:$invertVolume,layout:'$controlsLayout',x:'$controlsX',y:'$controlsY'," +
             "size:'$controlsSize',controlsHide:'$controlsHide'"
 
     companion object {

@@ -64,9 +64,142 @@ a[href*="utm_source=comix"] {
   display: none !important;
 }
 
-/* The app's reader options, appended to the site's settings sheet in its own markup. */
+/* The app's reader options, appended to the site's settings sheet: grouped cards of rows, like
+   the app's own settings page. Switches for on/off, segmented choices, chips for buttons shown. */
 #cx-reader-settings {
   display: contents;
+}
+#cx-reader-settings .cx-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+#cx-reader-settings .cx-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 0.15s;
+}
+#cx-reader-settings .cx-row + .cx-row {
+  border-top: 1px solid rgb(var(--text-rgb) / 0.07);
+}
+#cx-reader-settings .cx-row--switch {
+  cursor: pointer;
+}
+#cx-reader-settings .cx-row--switch:active {
+  background: rgb(var(--text-rgb) / 0.04);
+}
+#cx-reader-settings .cx-row--choice {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+#cx-reader-settings .cx-row.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+#cx-reader-settings .cx-row__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+#cx-reader-settings .cx-row__label {
+  color: var(--text-emphasis);
+  font-size: var(--text-sm, 14px);
+  font-weight: 500;
+  line-height: 1.3;
+}
+#cx-reader-settings .cx-row__hint {
+  color: var(--text-3);
+  font-size: var(--text-xs, 12px);
+  line-height: 1.35;
+}
+#cx-reader-settings .cx-switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--bg);
+  transition: background 0.18s;
+}
+#cx-reader-settings .cx-switch::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.18s;
+}
+#cx-reader-settings [aria-checked="true"] > .cx-switch {
+  background: var(--accent);
+}
+#cx-reader-settings [aria-checked="true"] > .cx-switch::after {
+  transform: translateX(18px);
+  background: var(--accent-ink);
+}
+#cx-reader-settings .cx-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+#cx-reader-settings .cx-seg__opt {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: var(--text-sm, 14px);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+#cx-reader-settings .cx-seg__opt.is-on {
+  background: var(--surface-3);
+  color: var(--text-emphasis);
+  font-weight: 600;
+}
+#cx-reader-settings .cx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#cx-reader-settings .cx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px 7px 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-3);
+  font-size: var(--text-sm, 14px);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+#cx-reader-settings .cx-chip svg {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#cx-reader-settings .cx-chip.is-on {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+#cx-reader-settings .cx-chip.is-on svg {
+  opacity: 1;
 }
 
 /* No sideways stretch when a swipe hits the edge of the page (vertical bounce stays). */
@@ -145,12 +278,6 @@ html[data-cx-hide~="comments"] .rpage-floatctl [aria-label="Toggle comments"],
 html[data-cx-hide~="chapters"] .rpage-floatctl__col [aria-label="Chapter list"],
 html[data-cx-hide~="autoscroll"] .rpage-floatctl [aria-label*="auto-scroll"] {
   display: none !important;
-}
-.cx-checks {
-  flex-wrap: wrap !important;
-}
-.cx-checks > .rpage-opt {
-  flex: 1 1 calc(50% - 6px) !important;
 }
 
 /* Size: large touch targets */
