@@ -79,7 +79,7 @@ try {
   check('Header `.topnav`', await page.$('.topnav'), diag, 'native top bar replaces it; site header would show twice');
   check('Header hidden by app stylesheet', await page.evaluate(() => getComputedStyle(document.querySelector('.topnav') || document.body).visibility === 'hidden'), '', 'double header');
   check('Log in button `.topnav .login-btn`', await page.$('.topnav .login-btn'), '', 'native Log in button, logged-in detection, Library/History prompt');
-  check('Settings button `.topnav .settings button`', await page.$('.topnav .settings button'), '', 'native site-settings button');
+  check('Settings button `.topnav .settings button`', await page.$('.topnav .settings button'), '', 'More → Theme & content filter');
   const st = await lastState();
   check('Page state reaches the app', st, '', 'titles, login state, theme sync');
   check('Theme variables (--bg, --accent, --text)', st && st.theme && st.theme.bg && st.theme.accent && st.theme.text, st ? JSON.stringify({ bg: st.theme.bg, accent: st.theme.accent }) : '', 'native colours follow the site theme');
@@ -107,7 +107,8 @@ try {
   check('Create-account link (`.auth__link`)', await page.evaluate(() => /create your account/i.test((document.querySelector('.auth__title') || {}).textContent || '')), '', 'More → Create an account');
   await page.evaluate(() => window.__comixium.closeDialog()); await wait(500);
   await page.evaluate(() => window.__comixium.openSettings()); await wait(700);
-  check('Site settings dialog (`.settings-dialog`)', await page.$('.settings-dialog'), '', 'native site-settings button');
+  check('Site settings dialog (`.settings-dialog`)', await page.$('.settings-dialog'), '', 'More → Theme & content filter');
+  check('Site settings open as a bottom sheet (`.settings-dialog__panel`)', await page.evaluate(() => { const p = document.querySelector('.settings-dialog__panel'); return !!p && Math.abs(p.getBoundingClientRect().bottom - innerHeight) < 2; }), '', 'Theme & content filter sheet');
   await page.evaluate(() => window.__comixium.closeDialog()); await wait(500);
 
   // --- Series page ----------------------------------------------------------------------------
@@ -116,6 +117,8 @@ try {
   check('Series links look like `/title/<slug>`', titleHref && /^\/title\/[^/]+\/?$/.test(titleHref), titleHref || 'none found', 'series detection (share button)');
   if (titleHref) {
     await open(titleHref);
+    check('Series header parts (`.mpage__hero-inner`, `.mpage__poster`, `.mpage__title-row`)', await page.$('.mpage__hero-inner .mpage__poster') && await page.$('.mpage__hero-inner .mpage__title-row'), '', 'title beside the cover');
+    check('Title sits beside the cover', await page.evaluate(() => { const p = document.querySelector('.mpage__poster'), t = document.querySelector('.mpage__title-row'); if (!p || !t) return false; const a = p.getBoundingClientRect(), b = t.getBoundingClientRect(); return b.left >= a.right - 1 && b.top < a.bottom; }), '', 'title beside the cover');
     const chapterHref = await page.evaluate(() => (document.querySelector('a[href*="-chapter-"]') || {}).getAttribute?.('href'));
     check('Chapter links look like `/title/<slug>/<id>-chapter-<n>`', chapterHref && /^\/title\/[^/]+\/\d+-chapter-[^/?#]+\/?$/.test(chapterHref), chapterHref || 'none found', 'reader mode, Back treating chapters as one page');
 

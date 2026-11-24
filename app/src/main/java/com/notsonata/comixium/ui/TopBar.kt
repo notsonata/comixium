@@ -50,12 +50,12 @@ fun ComixTopBar(
     showBrand: Boolean,
     auth: AuthState,
     onBack: () -> Unit,
-    onSearch: () -> Unit,
-    onSettings: () -> Unit,
+    /** Null hides the search icon (e.g. on Browse, which has its own search box). */
+    onSearch: (() -> Unit)?,
     onLogin: () -> Unit,
     onNotifications: () -> Unit,
     onProfile: () -> Unit,
-    /** Shown in place of the settings icon on series pages. */
+    /** Shown on series pages. */
     onShare: (() -> Unit)? = null,
 ) {
     val c = LocalComixColors.current
@@ -95,8 +95,8 @@ fun ComixTopBar(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
-            BarIcon(Lucide.Search, "Search", onSearch)
-            if (onShare != null) BarIcon(Lucide.Share, "Share", onShare) else BarIcon(Lucide.Settings, "Site settings", onSettings)
+            if (onSearch != null) BarIcon(Lucide.Search, "Search", onSearch)
+            if (onShare != null) BarIcon(Lucide.Share, "Share", onShare)
             when (auth) {
                 AuthState.LOGGED_IN -> {
                     BarIcon(Lucide.Bell, "Notifications", onNotifications)

@@ -122,6 +122,12 @@ class WebTab(
         webView.loadUrl(url)
     }
 
+    /** Opens [path] fresh and runs a page-script helper (e.g. openSettings) once it has loaded. */
+    fun openWithAction(path: String, action: String) {
+        pendingAction = action
+        open(path)
+    }
+
     /** Navigate to [path] on top of the current history (deep links), now or once shown. */
     fun push(path: String) {
         if (!created) pendingPath = path else loadPath(path)

@@ -80,13 +80,13 @@ class ChromeScreenshotTest {
 
     @Test fun homeLoggedOut() = shot("home_logged_out") {
         Frame(ComixColors(), {
-            ComixTopBar("", showBack = false, showBrand = true, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {}, {})
+            ComixTopBar("", showBack = false, showBrand = true, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {})
         }, AppTab.HOME) {}
     }
 
     @Test fun homeLightTheme() = shot("home_light", light) {
         Frame(light, {
-            ComixTopBar("", showBack = false, showBrand = true, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {})
+            ComixTopBar("", showBack = false, showBrand = true, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {})
         }, AppTab.HOME) {}
     }
 
@@ -111,13 +111,13 @@ class ChromeScreenshotTest {
 
     @Test fun titlePageLoggedIn() = shot("title_logged_in") {
         Frame(ComixColors(), {
-            ComixTopBar("Return of the Blossoming Blade", showBack = true, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {}, onShare = {})
+            ComixTopBar("Return of the Blossoming Blade", showBack = true, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, onShare = {})
         }, AppTab.BROWSE) {}
     }
 
     @Test fun moreLoggedOut() = shot("more_logged_out") {
         Frame(ComixColors(), {
-            ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {}, {})
+            ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {})
         }, AppTab.MORE) {
             MoreScreen(AuthState.LOGGED_OUT, "comix.ws", true, 37, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), appPrefs(), {}, {}, {})
         }
@@ -125,7 +125,7 @@ class ChromeScreenshotTest {
 
     @Test fun moreLoggedInLightTheme() = shot("more_logged_in_light", light) {
         Frame(light, {
-            ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {})
+            ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {})
         }, AppTab.MORE) {
             MoreScreen(AuthState.LOGGED_IN, "comix.to", false, 0, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), appPrefs(), {}, {}, {})
         }
@@ -133,7 +133,7 @@ class ChromeScreenshotTest {
 
     @Test fun libraryLoggedOut() = shot("library_login_prompt") {
         Frame(ComixColors(), {
-            ComixTopBar("Library", showBack = false, showBrand = false, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {}, {})
+            ComixTopBar("Library", showBack = false, showBrand = false, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {})
         }, AppTab.LIBRARY) { LoginPrompt(AppTab.LIBRARY, {}, {}) }
     }
 
