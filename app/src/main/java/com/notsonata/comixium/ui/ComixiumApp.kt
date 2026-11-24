@@ -3,9 +3,16 @@ package com.notsonata.comixium.ui
 import android.widget.Toast
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -47,6 +54,9 @@ import com.notsonata.comixium.web.WebTab
 import java.net.URLEncoder
 
 private const val MORE_PAGE = "MORE_PAGE"
+
+/** Android's predictive-back progress curve: responsive at first, then decelerating. */
+private val BACK_EASING = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
 
 /**
  * The app shell: native top bar, bottom tabs, search and More screens around the site's pages.
@@ -143,22 +153,25 @@ private fun AppContent(engine: WebEngine) {
 
     val canHandleBack = searchOpen || current?.canGoBack == true || current?.dialogOpen == true ||
         (selected == AppTab.MORE && morePageOpen) || selected != AppTab.HOME
-    // Predictive back (Android 14+): the page shrinks slightly toward the swipe while the gesture
-    // is in progress, then Back runs on release. Older versions just get the Back action.
-    var backProgress by remember { mutableFloatStateOf(0f) }
+    // Predictive back (Android 14+): the page follows the finger 1:1 (shrinks a little and slides
+    // toward the swipe), then settles in ~90 ms on release or springs back fast on cancel.
+    val backAnim = remember { Animatable(0f) }
     var backFromLeft by remember { mutableStateOf(true) }
+    val backScope = rememberCoroutineScope()
     PredictiveBackHandler(enabled = canHandleBack) { events ->
         try {
             events.collect { e ->
-                backProgress = e.progress
                 backFromLeft = e.swipeEdge == BackEventCompat.EDGE_LEFT
+                backAnim.snapTo(BACK_EASING.transform(e.progress))
             }
             back()
-        } finally {
-            backProgress = 0f
+            backScope.launch { backAnim.animateTo(0f, tween(90, easing = LinearOutSlowInEasing)) }
+        } catch (e: CancellationException) {
+            backScope.launch { backAnim.animateTo(0f, spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow)) }
+            throw e
         }
     }
-    val animatedBack by animateFloatAsState(backProgress, label = "predictive-back")
+    val animatedBack = backAnim.value
 
     val imeVisible = WindowInsets.isImeVisible
     Scaffold(
@@ -204,11 +217,11 @@ private fun AppContent(engine: WebEngine) {
                 .graphicsLayer {
                     val p = animatedBack
                     if (p > 0f) {
-                        val scale = 1f - 0.08f * p
+                        val scale = 1f - 0.1f * p
                         scaleX = scale
                         scaleY = scale
-                        translationX = (if (backFromLeft) 1f else -1f) * 24.dp.toPx() * p
-                        shape = RoundedCornerShape(28.dp * p)
+                        translationX = (if (backFromLeft) 1f else -1f) * 16.dp.toPx() * p
+                        shape = RoundedCornerShape(24.dp * p)
                         clip = true
                     }
                 },

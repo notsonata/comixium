@@ -33,6 +33,11 @@ a[href*="utm_source=comix"] {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+/* The site's logos (hidden header, footer) run an endless colour animation that repaints every
+   frame; it costs scrolling smoothness for a barely visible effect. */
+.logo svg {
+  animation: none !important;
+}
 .topnav .notifpop,
 .topnav .usermenu__pop,
 .topnav .browse-pop {

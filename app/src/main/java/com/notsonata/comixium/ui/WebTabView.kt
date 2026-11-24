@@ -20,7 +20,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -52,14 +56,18 @@ fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier, vi
                 it.setProgressBackgroundColorSchemeColor(colors.surface2.toArgb())
                 tab.setBackgroundColor(colors.bg.toArgb())
                 it.visibility = if (visible) android.view.View.VISIBLE else android.view.View.INVISIBLE
+                tab.setShown(visible)
             },
             modifier = Modifier.fillMaxSize(),
         )
         if (!visible) return@Box
-        if (tab.loading && tab.progress in 1..99) {
+        val showProgress = tab.loading && tab.progress in 1..99
+        val progress by animateFloatAsState(if (showProgress) tab.progress / 100f else 1f, tween(220), label = "load-progress")
+        val progressAlpha by animateFloatAsState(if (showProgress) 1f else 0f, tween(if (showProgress) 90 else 260), label = "load-progress-alpha")
+        if (progressAlpha > 0f) {
             LinearProgressIndicator(
-                progress = { tab.progress / 100f },
-                modifier = Modifier.fillMaxWidth().height(2.dp).align(Alignment.TopCenter),
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(2.dp).align(Alignment.TopCenter).alpha(progressAlpha),
                 color = colors.accent,
                 trackColor = Color.Transparent,
                 drawStopIndicator = {},
