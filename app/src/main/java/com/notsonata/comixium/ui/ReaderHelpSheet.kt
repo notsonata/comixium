@@ -66,6 +66,11 @@ fun TouchControls(reader: ReaderPrefs, onChanged: () -> Unit, modifier: Modifier
         Gesture("Save or share a page", "hold")
         Gesture("Back to the series", "back")
 
+        SectionLabel("CONTROLS", Modifier.padding(start = 20.dp, top = 20.dp, bottom = 8.dp))
+        Column(Modifier.padding(horizontal = 12.dp).clip(RoundedCornerShape(12.dp)).background(c.bg2)) {
+            ReaderControlsSettings(reader, onChanged)
+        }
+
         SectionLabel("OPTIONS", Modifier.padding(start = 20.dp, top = 20.dp, bottom = 8.dp))
         Column(Modifier.padding(horizontal = 12.dp).clip(RoundedCornerShape(12.dp)).background(c.bg2)) {
             ToggleRow(

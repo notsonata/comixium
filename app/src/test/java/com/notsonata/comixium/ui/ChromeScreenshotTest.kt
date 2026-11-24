@@ -138,6 +138,13 @@ class ChromeScreenshotTest {
         }
     }
 
+    @Test fun readerControlsSettings() = shot("reader_controls_settings") {
+        val prefs = readerPrefs().apply { updateControlsLayout("bar"); updateControlsY("bottom"); updateControlsSize("large") }
+        Box(Modifier.fillMaxSize().background(ComixColors().bg2).padding(top = 24.dp)) {
+            ReaderControlsSettings(prefs, onChanged = {})
+        }
+    }
+
     @Test fun search() {
         val prefs = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("t", Context.MODE_PRIVATE)
         val recent = RecentSearches(prefs).apply { add("solo leveling"); add("return of the blossoming blade"); add("villainess") }

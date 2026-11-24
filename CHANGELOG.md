@@ -10,6 +10,14 @@ Navigation:
 - Back leaves the reader in one step instead of going through every chapter read
 - Back gesture shows a preview animation on Android 14+
 
+Reader controls:
+
+- Layout options: rail, bar or minimal
+- Position options: top or bottom, left, center or right
+- Large size option for bigger touch targets
+- Controls stay clear of the progress bar
+- Set from the reader's help button or More → Reader controls
+
 ## 1.1.0
 
 New look:
