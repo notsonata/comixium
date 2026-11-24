@@ -17,6 +17,29 @@ a[href*="utm_source=comix"] {
   display: none !important;
 }
 
+/* --- Native chrome replaces the site header --------------------------------------------- */
+/* The app draws its own top bar (search, settings, login) and bottom tabs (the site's Browse menu
+   lives in More). The header stays in the DOM, invisible and out of the layout, because the app
+   still clicks its hidden buttons to open the site's own login and settings dialogs, and because
+   its popovers (notifications, user menu) render inside it. */
+.topnav {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.topnav .notifpop,
+.topnav .usermenu__pop,
+.topnav .browse-pop {
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
 /* --- Things that make no sense inside the app --------------------------------------------- */
 /* "Install PWA" banner (the Discord one stays). */
 .pwa-banner:not(.pwa-banner--discord) {

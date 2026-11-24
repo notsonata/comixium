@@ -33,6 +33,18 @@ object Site {
     /** Same path on another domain (for falling back from comix.ws to comix.to and back). */
     fun swapDomain(url: String, domain: String): String = url(domain, pathOf(url))
 
+    /** True if two site URLs/paths point at the same page (ignoring domain, trailing slash and "/home"). */
+    fun samePage(a: String?, b: String?): Boolean {
+        fun norm(x: String?): String {
+            val p = if (x == null) "/" else if (x.startsWith("/")) x else pathOf(x)
+            val noFrag = p.substringBefore('#')
+            val path = noFrag.substringBefore('?').trimEnd('/').ifEmpty { "/" }.let { if (it == "/home") "/" else it }
+            val query = noFrag.substringAfter('?', "")
+            return if (query.isEmpty()) path else "$path?$query"
+        }
+        return norm(a) == norm(b)
+    }
+
     /** Path only, without query or fragment. */
     fun pathOnly(url: String?): String {
         val m = url?.let { URL_PARTS.find(it.trim()) } ?: return "/"

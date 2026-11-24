@@ -42,7 +42,8 @@ data class WebError(val url: String, val code: Int, val description: String, val
  */
 class WebTab(
     val key: String,
-    private val startPath: String,
+    /** Page this tab starts on and returns to when its bottom-bar item is tapped again; null = blank until told. */
+    val startPath: String?,
     private val engine: WebEngine,
 ) {
     var url by mutableStateOf<String?>(null)
@@ -65,9 +66,18 @@ class WebTab(
     var generation by mutableIntStateOf(0)
         private set
 
+    val isAtRoot: Boolean get() = startPath != null && Site.samePage(url, startPath)
+    val displayTitle: String get() = PageTitle.of(url, title)
+    val isCreated: Boolean get() = created
+
     private val main = Handler(Looper.getMainLooper())
     private val contextWrapper = MutableContextWrapper(null)
     private var created = false
+    private var clearHistoryOnLoad = false
+    /** Path requested before the views existed (e.g. a More-screen link); loaded on attach. */
+    private var pendingPath: String? = null
+    /** A site helper (openLogin, openSettings...) to run once a page with the site header has loaded. */
+    private var pendingAction: String? = null
     lateinit var webView: WebView
         private set
     lateinit var container: SwipeRefreshLayout
@@ -83,7 +93,18 @@ class WebTab(
             setOnChildScrollUpCallback { _, _ -> !canPullToRefresh() }
         }
         installWebView()
-        loadPath(startPath)
+        (pendingPath ?: startPath)?.let(::loadPath)
+        pendingPath = null
+    }
+
+    /** Load [path] now, or as soon as the tab is first shown. Replaces the tab's history. */
+    fun open(path: String) {
+        if (!created) {
+            pendingPath = path
+            return
+        }
+        clearHistoryOnLoad = true
+        loadPath(path)
     }
 
     /** Point the views at the application context so a destroyed activity isn't leaked. */
@@ -99,6 +120,30 @@ class WebTab(
     fun loadUrl(url: String) {
         error = null
         webView.loadUrl(url)
+    }
+
+    /** Bottom-bar reselect: scroll to top if already on the tab's start page, else go there fresh. */
+    fun goRoot() {
+        val root = startPath ?: return
+        if (isAtRoot && error == null) {
+            js("window.scrollTo({top:0,behavior:'smooth'})")
+        } else {
+            clearHistoryOnLoad = true
+            loadPath(root)
+        }
+    }
+
+    /**
+     * Runs one of the page script's helpers (see comixium.js). Helpers that need the site header
+     * (login, settings) can't work on reader pages, so the tab hops to the home page and runs it there.
+     */
+    fun siteAction(name: String) {
+        js("window.__comixium ? window.__comixium.$name() : false") { result ->
+            if (result != "true") {
+                pendingAction = name
+                loadPath("/")
+            }
+        }
     }
 
     fun reload() {
@@ -188,6 +233,11 @@ class WebTab(
         isReader = state.isReader || Site.isReaderUrl(state.url)
         dialogOpen = state.dialogOpen
         engine.onPageState(state)
+        val action = pendingAction
+        if (action != null && state.auth != AuthState.UNKNOWN) {
+            pendingAction = null
+            js("window.__comixium && window.__comixium.$action()")
+        }
     }
 
     /** Renderer crashed or was killed for memory: swap in a fresh WebView at the same URL. */
@@ -197,7 +247,7 @@ class WebTab(
         webView.destroy()
         installWebView()
         generation++
-        if (last != null) webView.loadUrl(last) else loadPath(startPath)
+        if (last != null) webView.loadUrl(last) else startPath?.let(::loadPath)
     }
 
     private fun openExternal(url: String) {
@@ -266,6 +316,10 @@ class WebTab(
         override fun onPageFinished(view: WebView, url: String) {
             loading = false
             container.isRefreshing = false
+            if (clearHistoryOnLoad) {
+                clearHistoryOnLoad = false
+                view.clearHistory()
+            }
             canGoBack = view.canGoBack()
             if (injectManually && Site.isSiteUrl(url)) view.evaluateJavascript(engine.pageScript, null)
             if (error == null && Site.isSiteUrl(url)) engine.onLoadSucceeded(Site.hostOf(url))

@@ -36,10 +36,11 @@ import com.notsonata.comixium.web.WebTab
 
 /** Hosts one tab's WebView, with a thin loading bar and a native error screen on top. */
 @Composable
-fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier) {
+fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier, visible: Boolean = true) {
     val context = LocalContext.current
     val colors = LocalComixColors.current
-    Box(modifier.background(colors.bg)) {
+    // Hidden tabs stay composed (so their pages and scroll positions survive) but don't draw.
+    Box(modifier.then(if (visible) Modifier.background(colors.bg) else Modifier)) {
         AndroidView(
             factory = {
                 tab.attach(context)
@@ -50,9 +51,11 @@ fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier) {
                 it.setColorSchemeColors(colors.accent.toArgb())
                 it.setProgressBackgroundColorSchemeColor(colors.surface2.toArgb())
                 tab.setBackgroundColor(colors.bg.toArgb())
+                it.visibility = if (visible) android.view.View.VISIBLE else android.view.View.INVISIBLE
             },
             modifier = Modifier.fillMaxSize(),
         )
+        if (!visible) return@Box
         if (tab.loading && tab.progress in 1..99) {
             LinearProgressIndicator(
                 progress = { tab.progress / 100f },
@@ -75,7 +78,7 @@ fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ErrorPane(
+internal fun ErrorPane(
     error: WebError,
     online: Boolean,
     onRetry: () -> Unit,

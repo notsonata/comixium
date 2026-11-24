@@ -41,6 +41,29 @@ class WebEngine(private val app: Application) {
     var blockedCount by mutableIntStateOf(0)
         private set
 
+    val recentSearches = RecentSearches(prefs)
+
+    private val tabs = linkedMapOf<String, WebTab>()
+
+    /** Tabs live as long as the process, so switching tabs or recreating the activity keeps pages. */
+    fun tab(key: String, startPath: String?): WebTab = tabs.getOrPut(key) { WebTab(key, startPath, this) }
+
+    val createdTabs: Collection<WebTab> get() = tabs.values
+
+    /** Moves every open tab to the same page on [domain] (after the user picks a different domain). */
+    fun switchDomain(d: String) {
+        selectDomain(d)
+        failedDomains.clear()
+        tabs.values.filter { it.isCreated }.forEach { t ->
+            val u = t.url
+            if (u != null && Site.isSiteUrl(u)) t.loadUrl(Site.swapDomain(u, d)) else t.startPath?.let(t::loadPath)
+        }
+    }
+
+    fun clearCache() {
+        tabs.values.firstOrNull { it.isCreated }?.webView?.clearCache(true)
+    }
+
     /** Domains we already fell back from during this process, so a total outage can't ping-pong. */
     private val failedDomains = mutableSetOf<String>()
 
@@ -50,8 +73,12 @@ class WebEngine(private val app: Application) {
         js.replace("__COMIXIUM_CSS__", JSONObject.quote(css))
     }
 
-    fun setAdBlockEnabled(on: Boolean) {
+    var adBlockEnabled by mutableStateOf(adBlocker.enabled)
+        private set
+
+    fun updateAdBlock(on: Boolean) {
         adBlocker.enabled = on
+        adBlockEnabled = on
         prefs.edit { putBoolean(KEY_ADBLOCK, on) }
     }
 

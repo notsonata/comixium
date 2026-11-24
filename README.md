@@ -7,6 +7,20 @@ nothing breaks when the site changes its private API. Everything around the page
 bottom tabs, top bar, search, back gestures, pull-to-refresh, a full-screen reader, sharing,
 and built-in ad blocking.
 
+## What's native
+
+| | |
+| --- | --- |
+| Bottom tabs | Home, Browse, Library, History, More. Each keeps its own page and back stack; tapping the active tab again scrolls to top or returns to its start page. |
+| Top bar | Replaces the site header: back, page title, search, site settings, log in (or notifications and profile when logged in). |
+| Search | Native field with recent searches; results open in the Browse tab (`/browse?q=`). |
+| More | Account pages, the site's Browse menu shortcuts, the site's theme/content settings, ad blocking toggle, domain switch, cache. |
+| Library / History | Show a native log-in prompt when you're logged out (the site redirects those pages). |
+| Theme | Native colours follow whatever theme you pick in the site's settings (Main, Dark, Light, Custom). |
+
+Screenshots of the native parts (rendered on the JVM by Roborazzi) live in `app/screenshots/`;
+regenerate them with `./gradlew recordRoborazziDebug`.
+
 ## Install
 
 Download `comixium.apk` from the [latest release](../../releases/latest) and open it on your
