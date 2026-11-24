@@ -34,13 +34,26 @@ jobs:
           name: comixium-apk
           path: app/build/outputs/apk/release/*.apk
 
-      - name: Publish rolling "latest" release
+      - name: Read app version
+        id: version
+        run: echo "name=$(sed -n 's/^val appVersion = "\(.*\)"$/\1/p' app/build.gradle.kts)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release for this version
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.name }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk comixium.apk
+          test -n "$VERSION"
+          APK="comixium-${VERSION}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          # The old rolling release from before releases were versioned.
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest comixium.apk \
-            --title "Comixium (latest main)" \
-            --notes "Automatic build of ${GITHUB_SHA}. Install comixium.apk; it updates in place over earlier builds."
+          # A merge that doesn't bump the version rebuilds that version's release on the new commit.
+          gh release delete "v${VERSION}" --yes --cleanup-tag || true
+          gh release create "v${VERSION}" "$APK" \
+            --target "$GITHUB_SHA" \
+            --title "Comixium ${VERSION}" \
+            --notes "Comixium ${VERSION}, built from ${GITHUB_SHA::7}. Install ${APK}; it updates in place over earlier builds and keeps your login." \
+            --generate-notes \
+            --latest
