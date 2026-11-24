@@ -39,3 +39,15 @@ data class PageState(
         }.getOrNull()
     }
 }
+
+/** A file the page generated in memory (blob:/data: link) and asked us to save. */
+class PageDownload(val name: String, val mime: String, val bytes: ByteArray) {
+    companion object {
+        fun parse(json: String): PageDownload? = runCatching {
+            val o = JSONObject(json)
+            if (o.optString("t") != "download") return null
+            val data = java.util.Base64.getDecoder().decode(o.getString("data"))
+            PageDownload(o.optString("name").ifBlank { "download" }, o.optString("mime").ifBlank { "application/octet-stream" }, data)
+        }.getOrNull()
+    }
+}

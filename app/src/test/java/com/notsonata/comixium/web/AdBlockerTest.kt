@@ -31,6 +31,11 @@ class AdBlockerTest {
         assertTrue(b.shouldBlock("https://pq4.cozyhomegoods.site/x.js", "*/*", false))
     }
 
+    @Test fun acceptsPlainText() {
+        val b = AdBlocker { "ads.example.com\n".byteInputStream() }.apply { load() }
+        assertTrue(b.isBlockedHost("x.ads.example.com"))
+    }
+
     @Test fun disabledBlocksNothing() {
         val b = blocker("tracker.net").apply { enabled = false }
         assertFalse(b.shouldBlock("https://tracker.net/p.js", "*/*", false))

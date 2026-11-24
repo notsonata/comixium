@@ -1,5 +1,6 @@
 package com.notsonata.comixium.web
 
+import java.io.BufferedInputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
 import kotlin.concurrent.thread
@@ -7,7 +8,8 @@ import kotlin.concurrent.thread
 /**
  * Network-level blocker for third-party ad and tracker hosts.
  *
- * The domain list is StevenBlack's unified hosts file (MIT), bundled as `assets/adblock/hosts.gz`.
+ * The domain list is StevenBlack's unified hosts file (MIT), bundled as `assets/adblock/hosts.txt`
+ * (one domain per line; the APK compresses it). Gzipped input is accepted too.
  * comix's own ads are first-party (a popunder link and promo banners built by the site's bundle),
  * so those are handled by the injected CSS/JS instead; this class covers the third-party side.
  *
@@ -30,7 +32,11 @@ class AdBlocker(private val source: () -> InputStream?) {
         set += EXTRA_BLOCKED
         runCatching {
             source()?.let { raw ->
-                GZIPInputStream(raw).bufferedReader().useLines { lines ->
+                val input = BufferedInputStream(raw)
+                input.mark(2)
+                val gzipped = input.read() == 0x1f && input.read() == 0x8b
+                input.reset()
+                (if (gzipped) GZIPInputStream(input) else input).bufferedReader().useLines { lines ->
                     for (line in lines) {
                         val d = line.trim()
                         if (d.isNotEmpty() && !d.startsWith("#")) set += d.lowercase()

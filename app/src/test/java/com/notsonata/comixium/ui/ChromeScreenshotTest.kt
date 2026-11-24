@@ -66,7 +66,7 @@ class ChromeScreenshotTest {
 
     @Test fun titlePageLoggedIn() = shot("title_logged_in") {
         Frame(ComixColors(), {
-            ComixTopBar("Return of the Blossoming Blade", showBack = true, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {})
+            ComixTopBar("Return of the Blossoming Blade", showBack = true, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {}, onShare = {})
         }, AppTab.BROWSE) {}
     }
 

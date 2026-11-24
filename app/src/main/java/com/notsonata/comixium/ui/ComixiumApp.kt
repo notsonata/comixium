@@ -32,6 +32,8 @@ import android.app.Activity
 import android.view.WindowManager
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.web.AuthState
+import com.notsonata.comixium.web.Downloads
+import com.notsonata.comixium.web.Site
 import com.notsonata.comixium.web.WebEngine
 import com.notsonata.comixium.web.WebTab
 import java.net.URLEncoder
@@ -79,6 +81,15 @@ fun ComixiumApp(engine: WebEngine) {
             returnAfterLogin?.let { selected = it }
             returnAfterLogin = null
         }
+    }
+
+    // Links opened from other apps land on top of the Home tab's history.
+    LaunchedEffect(engine.deepLinkPath) {
+        val path = engine.deepLinkPath ?: return@LaunchedEffect
+        engine.deepLinkPath = null
+        searchOpen = false
+        selected = AppTab.HOME
+        webTab(AppTab.HOME).push(path)
     }
 
     fun select(t: AppTab) {
@@ -143,6 +154,9 @@ fun ComixiumApp(engine: WebEngine) {
                     onLogin = { siteAction("openLogin") },
                     onNotifications = { openInMore("/user?tab=notifs") },
                     onProfile = { openInMore("/user") },
+                    onShare = current?.takeIf { Site.isTitleUrl(it.url) }?.let { t ->
+                        { Downloads.shareText(context, t.displayTitle, listOf(t.displayTitle, t.url).filter { !it.isNullOrBlank() }.joinToString("\n")) }
+                    },
                 )
             }
         },
