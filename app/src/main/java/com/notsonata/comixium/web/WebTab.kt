@@ -253,7 +253,7 @@ class WebTab(
             val hit = wv.hitTestResult
             val src = hit.extra
             val isImage = hit.type == WebView.HitTestResult.IMAGE_TYPE || hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
-            if (isImage && src != null && (Site.schemeOf(src) == "https" || Site.schemeOf(src) == "http")) {
+            if (isImage && engine.reader.longPressMenu && src != null && (Site.schemeOf(src) == "https" || Site.schemeOf(src) == "http")) {
                 engine.services?.onImageLongPress(src, displayTitle.ifBlank { "comixium" })
                 true
             } else {
@@ -283,12 +283,9 @@ class WebTab(
     }
 
     private fun onMessage(json: String) {
-        when (PageState.type(json)) {
-            "readerHelp" -> { engine.readerHelpOpen = true; return }
-            "pref" -> {
-                runCatching { org.json.JSONObject(json) }.getOrNull()?.let { engine.onPagePref(it.optString("key"), it.optBoolean("value")) }
-                return
-            }
+        if (PageState.type(json) == "pref") {
+            runCatching { org.json.JSONObject(json) }.getOrNull()?.let { engine.onPagePref(it.optString("key"), it.opt("value")) }
+            return
         }
         PageDownload.parse(json)?.let { d ->
             contextWrapper.baseContext?.let { Downloads.saveBytes(it, d.name, d.mime, d.bytes) }

@@ -2,6 +2,32 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.4.0
+
+Reader settings:
+
+- One settings button: the reader's gear opens a single sheet with every reader option
+- Help button removed; its touch info is at the bottom of the settings sheet
+
+Tapping:
+
+- Tap to turn pages (paged) and tap to scroll (long strip) can each be turned off
+- Tap zones on the left and right, or at the top and bottom
+- Small, medium or large tap zones
+- Inverted tap zones
+- Show controls with a double tap, a single tap, or not at all
+
+More reader options:
+
+- Inverted volume keys
+- Long-press image menu can be turned off
+
+Navigation:
+
+- Back closes open popups first: reader settings, chapter list, comments, menus and dropdowns
+- No back gesture animation when Back only closes a popup
+- No sideways stretch when a swipe reaches the edge of the page
+
 ## 1.3.0
 
 Smoother:
