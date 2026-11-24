@@ -8,7 +8,7 @@ plugins {
 
 // Bump this (and only this) to release a new version. CI tags the release v<appVersion>,
 // and versionCode follows automatically (1.2.3 -> 10203) so every bump installs as an update.
-val appVersion = "1.5.0"
+val appVersion = "1.6.0"
 val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
     major * 10_000 + minor * 100 + patch
 }
