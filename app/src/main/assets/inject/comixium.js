@@ -208,10 +208,15 @@
     accent: '--accent', accent2: '--accent-2', accentInk: '--accent-ink', danger: '--danger',
     readerBg: '--reader-bg'
   };
+  // Reading 15 custom properties forces a style pass, so do it only when <html> changes
+  // (theme switches set data-theme / inline variables there), not on every DOM update.
+  var themeCache = null;
   function theme() {
+    if (themeCache) return themeCache;
     var cs = window.getComputedStyle(document.documentElement);
     var out = {};
     for (var k in VARS) out[k] = cs.getPropertyValue(VARS[k]).trim();
+    if (out.bg) themeCache = out;
     return out;
   }
   function auth() {
@@ -244,10 +249,14 @@
     var key = JSON.stringify(s);
     if (key !== last) { last = key; post(s); }
   }
+  // Report when the page is idle (not mid-scroll or mid-animation), at most ~4 times a second.
   var timer = 0;
+  var idle = window.requestIdleCallback || function (cb) { return setTimeout(cb, 1); };
   function schedule() {
     if (timer) return;
-    timer = setTimeout(function () { timer = 0; report(); }, 150);
+    timer = setTimeout(function () {
+      idle(function () { timer = 0; report(); }, { timeout: 500 });
+    }, 250);
   }
 
   ['pushState', 'replaceState'].forEach(function (m) {
@@ -261,7 +270,10 @@
   window.addEventListener('popstate', schedule);
 
   // Popunder links and dialogs are added anywhere in the tree; theme/reader flags live on <html>/<body>.
-  var attrObserver = new MutationObserver(schedule);
+  var attrObserver = new MutationObserver(function (records) {
+    for (var i = 0; i < records.length; i++) if (records[i].target === document.documentElement) themeCache = null;
+    schedule();
+  });
   var watchedRoot = null, watchedBody = null;
   function watchRoots() {
     var root = document.documentElement, body = document.body;

@@ -185,8 +185,31 @@ class WebTab(
         if (created) webView.setBackgroundColor(argb)
     }
 
-    fun onPause() { if (created) webView.onPause() }
-    fun onResume() { if (created) webView.onResume() }
+    private var shown = true
+    private var activityResumed = true
+
+    /**
+     * Hidden tabs pause their WebView (animations, video, rendering work) so the visible one has
+     * the device to itself; the visible one pre-rasterizes offscreen tiles for smoother scrolling.
+     */
+    fun setShown(visible: Boolean) {
+        if (!created || visible == shown) return
+        shown = visible
+        webView.settings.offscreenPreRaster = visible
+        applyPause()
+    }
+
+    fun onPause() { activityResumed = false; applyPause() }
+    fun onResume() { activityResumed = true; applyPause() }
+
+    private var paused = false
+    private fun applyPause() {
+        if (!created) return
+        val shouldPause = !(shown && activityResumed)
+        if (shouldPause == paused) return
+        paused = shouldPause
+        if (shouldPause) webView.onPause() else webView.onResume()
+    }
 
     private fun canPullToRefresh(): Boolean =
         error == null && !isReader && !dialogOpen && webView.scrollY <= 0
@@ -196,6 +219,8 @@ class WebTab(
         val wv = WebView(contextWrapper)
         wv.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         wv.setBackgroundColor(engine.colors.bg.toArgb())
+        // Keep the renderer at foreground priority while this tab is on screen.
+        wv.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, true)
         wv.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -213,6 +238,7 @@ class WebTab(
             allowFileAccess = false
             allowContentAccess = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            offscreenPreRaster = shown
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(wv.settings, false)

@@ -1,5 +1,10 @@
 package com.notsonata.comixium.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,12 +73,19 @@ fun ComixTopBar(
         } else {
             Spacer(Modifier.width(12.dp))
         }
-        Box(Modifier.weight(1f)) {
-            if (showBrand && !showBack) {
+        // Title changes crossfade quickly instead of popping.
+        AnimatedContent(
+            targetState = if (showBrand && !showBack) null else title,
+            transitionSpec = { fadeIn(tween(140, delayMillis = 40)) togetherWith fadeOut(tween(90)) },
+            contentAlignment = Alignment.CenterStart,
+            modifier = Modifier.weight(1f),
+            label = "top-bar-title",
+        ) { shownTitle ->
+            if (shownTitle == null) {
                 ComixiumWordmark(height = 24.dp)
             } else {
                 Text(
-                    title,
+                    shownTitle,
                     style = TextStyle(fontFamily = Poppins, fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
                     color = c.textEmphasis,
                     maxLines = 1,

@@ -2,6 +2,17 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.3.0
+
+Smoother:
+
+- Back gesture follows the finger and settles faster
+- Page titles crossfade instead of popping
+- Loading bar animates smoothly
+- Background tabs pause while hidden
+- Removed always-running logo animations that cost scrolling smoothness
+- Lighter page monitoring while scrolling
+
 ## 1.2.0
 
 Navigation:
