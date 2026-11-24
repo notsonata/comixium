@@ -10,6 +10,5 @@ if [ -z "${notes//[[:space:]]/}" ]; then
   exit 1
 fi
 printf '%s\n\n---\n' "$notes"
-printf 'Install `comixium-%s.apk`; it updates over earlier versions and keeps my login.' "$version"
-if [ -n "$sha" ]; then printf ' Built from %s.' "${sha:0:7}"; fi
-printf '\n'
+printf -- '- Install `comixium-%s.apk`, updates in place over earlier versions\n' "$version"
+if [ -n "$sha" ]; then printf -- '- Built from %s\n' "${sha:0:7}"; fi
