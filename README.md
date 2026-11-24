@@ -40,9 +40,11 @@ sites only open (in a Custom Tab) when you actually tapped a link; scripted redi
 ## Versions
 
 Each merge to `main` publishes a GitHub release named after the app version (tag `v1.0.0`,
-title "Comixium 1.0.0", asset `comixium-1.0.0.apk`), with the merged pull requests listed in
-its notes. To ship a new version, bump `appVersion` in `app/build.gradle.kts`; `versionCode`
-follows from it. A merge that doesn't bump the version rebuilds that version's release.
+title "Comixium 1.0.0", asset `comixium-1.0.0.apk`). Its notes are that version's section of
+`CHANGELOG.md`; earlier releases are re-synced from the same file, so editing an old entry
+updates its release too. To ship a new version, bump `appVersion` in `app/build.gradle.kts`
+(`versionCode` follows from it) and add a matching `## x.y.z` section to the changelog; CI
+fails without one. A merge that doesn't bump the version rebuilds that version's release.
 
 ## Build
 
