@@ -5,31 +5,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notsonata.comixium.BuildConfig
@@ -37,9 +34,6 @@ import com.notsonata.comixium.ui.icons.Lucide
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.ui.theme.Poppins
 import com.notsonata.comixium.web.AuthState
-import com.notsonata.comixium.web.AppPrefs
-import com.notsonata.comixium.web.ReaderPrefs
-import com.notsonata.comixium.web.Site
 
 /** Shortcuts from the site's header "Browse" menu, in the same order. */
 val BROWSE_SHORTCUTS = listOf(
@@ -56,242 +50,76 @@ val BROWSE_SHORTCUTS = listOf(
 @Composable
 fun MoreScreen(
     auth: AuthState,
-    domain: String,
-    adBlockOn: Boolean,
-    blockedCount: Int,
     onOpen: (String) -> Unit,
     onLogin: () -> Unit,
     onRegister: () -> Unit,
     onSignOut: () -> Unit,
     onSiteSettings: () -> Unit,
-    onAdBlock: (Boolean) -> Unit,
-    onDomain: (String) -> Unit,
-    reader: ReaderPrefs,
-    app: AppPrefs,
-    onPagePrefsChanged: () -> Unit,
-    onMobileOptimizations: (Boolean) -> Unit,
-    onClearCache: () -> Unit,
+    onSettings: () -> Unit,
+    scroll: ScrollState = rememberScrollState(),
+    version: String = BuildConfig.VERSION_NAME,
 ) {
     val c = LocalComixColors.current
     Column(
-        Modifier.fillMaxSize().background(c.bg).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxSize().background(c.bg).verticalScroll(scroll).padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Section("ACCOUNT") {
+            // Notifications sit behind the bell in the top bar; Backup is a tab on the profile page.
             if (auth == AuthState.LOGGED_IN) {
-                Row(Lucide.User, "Profile") { onOpen("/user") }
-                Row(Lucide.Bell, "Notifications") { onOpen("/user?tab=notifs") }
-                Row(Lucide.Layers, "My collections") { onOpen("/user?tab=collections") }
-                Row(Lucide.Archive, "Backup") { onOpen("/user?tab=backup") }
-                Row(Lucide.Settings, "Account settings") { onOpen("/user?tab=settings") }
-                Row(Lucide.LogOut, "Sign out", danger = true, chevron = false, onClick = onSignOut)
+                LinkRow(Lucide.User, "Profile") { onOpen("/user") }
+                LinkRow(Lucide.Layers, "My collections") { onOpen("/user?tab=collections") }
+                LinkRow(Lucide.Settings, "Account settings") { onOpen("/user?tab=settings") }
+                LinkRow(Lucide.LogOut, "Sign out", danger = true, chevron = false, onClick = onSignOut)
             } else {
-                Row(Lucide.LogIn, "Log in", subtitle = "Sync your library and reading progress", accent = true, onClick = onLogin)
-                Row(Lucide.UserPlus, "Create an account", onClick = onRegister)
+                LinkRow(Lucide.LogIn, "Log in", subtitle = "Sync your library and reading progress", accent = true, onClick = onLogin)
+                LinkRow(Lucide.UserPlus, "Create an account", onClick = onRegister)
             }
         }
-        Section("BROWSE") {
-            BROWSE_SHORTCUTS.forEach { (label, icon, path) -> Row(icon, label) { onOpen(path) } }
-        }
-        Section("READER") {
-            ToggleRow(
-                Lucide.Expand, "Full screen", subtitle = "Hide the status and navigation bars while reading",
-                checked = reader.immersive, onChange = { reader.updateImmersive(it); onPagePrefsChanged() },
-            )
-            ToggleRow(
-                Lucide.Sun, "Keep screen on", subtitle = "While a chapter is open",
-                checked = reader.keepScreenOn, onChange = { reader.updateKeepScreenOn(it); onPagePrefsChanged() },
-            )
-            ToggleRow(
-                Lucide.ZoomIn, "Pinch to zoom", subtitle = "On chapter pages",
-                checked = reader.pinchZoom, onChange = { reader.updatePinchZoom(it); onPagePrefsChanged() },
-            )
-            ToggleRow(
-                Lucide.Download, "Long-press image menu", subtitle = "Save, share or copy a page",
-                checked = reader.longPressMenu, onChange = { reader.updateLongPressMenu(it); onPagePrefsChanged() },
-            )
-        }
-        Section("TAPPING") {
-            ToggleRow(
-                Lucide.Hand, "Tap to turn pages", subtitle = "Paged mode: tap the edges",
-                checked = reader.tapPaged, onChange = { reader.updateTapPaged(it); onPagePrefsChanged() },
-            )
-            ToggleRow(
-                Lucide.Hand, "Tap to scroll", subtitle = "Long strip: tap the edges to move a screen",
-                checked = reader.tapEdges, onChange = { reader.updateTapEdges(it); onPagePrefsChanged() },
-            )
-            Choice("Tap zones", null, listOf("sides" to "Left & right", "vertical" to "Top & bottom"), reader.tapLayout) {
-                reader.updateTapLayout(it); onPagePrefsChanged()
-            }
-            Choice("Tap zone size", null, listOf("small" to "Small", "medium" to "Medium", "large" to "Large"), reader.tapZone) {
-                reader.updateTapZone(it); onPagePrefsChanged()
-            }
-            ToggleRow(
-                Lucide.Refresh, "Invert tap zones", subtitle = "Left / top goes forward",
-                checked = reader.invertTaps, onChange = { reader.updateInvertTaps(it); onPagePrefsChanged() },
-            )
-            Choice(
-                "Show controls with", "A tap in the middle of the page",
-                listOf("double" to "Double tap", "single" to "Single tap", "off" to "Off"), reader.controlsTap,
-            ) { reader.updateControlsTap(it); onPagePrefsChanged() }
-        }
-        Section("VOLUME KEYS") {
-            ToggleRow(
-                Lucide.Volume, "Volume keys turn pages", subtitle = "Uses your reader scroll distance",
-                checked = reader.volumeKeys, onChange = { reader.updateVolumeKeys(it); onPagePrefsChanged() },
-            )
-            ToggleRow(
-                Lucide.Refresh, "Invert volume keys", subtitle = "Volume up goes forward",
-                checked = reader.invertVolume, onChange = { reader.updateInvertVolume(it); onPagePrefsChanged() },
-            )
-        }
-        Section("READER CONTROLS") {
-            ReaderControlsSettings(reader, onChanged = onPagePrefsChanged)
-        }
-        Section("HOME PAGE") {
-            ToggleRow(
-                Lucide.Bell, "Announcements",
-                subtitle = if (app.homeAnnouncements) "Tap ✕ on one to dismiss it" else "Hidden. Turning on brings back dismissed ones",
-                checked = app.homeAnnouncements, onChange = { app.updateHomeAnnouncements(it); onPagePrefsChanged() },
-            )
-            ToggleRow(
-                Lucide.Share, "Share bar", subtitle = "The row of share buttons on the home page",
-                checked = app.homeShareBar, onChange = { app.updateHomeShareBar(it); onPagePrefsChanged() },
-            )
-        }
+        SectionLabel("BROWSE", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp))
+        BrowseGrid(onOpen)
         Section("SETTINGS") {
-            ToggleRow(
-                Lucide.Hand, "Mobile optimizations",
-                subtitle = if (app.mobileOptimizations) "Touch-friendly fixes to the site's layout" else "Off: the site's own mobile layout",
-                checked = app.mobileOptimizations, onChange = onMobileOptimizations,
-            )
-            Row(Lucide.Palette, "Theme & content filter", subtitle = "The site's own settings", onClick = onSiteSettings)
-            ToggleRow(
-                Lucide.Shield, "Block ads",
-                subtitle = if (adBlockOn) "$blockedCount blocked this session" else "Off: the site's popunders and banners will show",
-                checked = adBlockOn, onChange = onAdBlock,
-            )
-            DomainRow(domain, onDomain)
-            Row(Lucide.Trash, "Clear cache", subtitle = "Frees space. Keeps your login.", chevron = false, onClick = onClearCache)
+            LinkRow(Lucide.Palette, "Theme & content filter", subtitle = "The site's own settings", onClick = onSiteSettings)
+            LinkRow(Lucide.Sliders, "App settings", subtitle = "Reader, tapping, controls, ads, storage", onClick = onSettings)
         }
         Section("ABOUT") {
-            Row(Lucide.Info, "Comixium ${BuildConfig.VERSION_NAME}", subtitle = "An app for comix.ws. Not affiliated with the site.", chevron = false) {}
+            LinkRow(Lucide.Info, "Comixium $version", subtitle = "An app for comix.ws. Not affiliated with the site.", chevron = false) {}
         }
         Spacer(Modifier.height(24.dp))
     }
 }
 
+/** The site's Browse menu as a two-column grid of tiles, so More stays short. */
 @Composable
-private fun Section(label: String, content: @Composable ColumnScope.() -> Unit) {
+private fun BrowseGrid(onOpen: (String) -> Unit) {
     val c = LocalComixColors.current
-    SectionLabel(label, Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.surface), content = content)
-}
-
-@Composable
-private fun Row(
-    icon: ImageVector,
-    label: String,
-    subtitle: String? = null,
-    accent: Boolean = false,
-    danger: Boolean = false,
-    chevron: Boolean = true,
-    onClick: () -> Unit,
-) {
-    val c = LocalComixColors.current
-    val tint = when {
-        danger -> c.danger
-        accent -> c.accent
-        else -> c.text2
-    }
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBadge(icon, tint)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                label,
-                style = TextStyle(fontFamily = Poppins, fontSize = 14.sp, fontWeight = FontWeight.Medium),
-                color = if (danger) c.danger else if (accent) c.accent else c.textEmphasis,
-            )
-            if (subtitle != null) {
-                Text(subtitle, style = TextStyle(fontFamily = Poppins, fontSize = 12.sp), color = c.text3)
-            }
-        }
-        if (chevron) Icon(Lucide.ChevronRight, null, tint = c.text4, modifier = Modifier.size(16.dp))
-    }
-}
-
-@Composable
-internal fun ToggleRow(icon: ImageVector, label: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    val c = LocalComixColors.current
-    Row(
-        Modifier.fillMaxWidth().clickable { onChange(!checked) }.heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBadge(icon, c.text2)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(label, style = TextStyle(fontFamily = Poppins, fontSize = 14.sp, fontWeight = FontWeight.Medium), color = c.textEmphasis)
-            Text(subtitle, style = TextStyle(fontFamily = Poppins, fontSize = 12.sp), color = c.text3)
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = c.accentInk,
-                checkedTrackColor = c.accent,
-                uncheckedThumbColor = c.text3,
-                uncheckedTrackColor = c.surface2,
-                uncheckedBorderColor = c.surface3,
-            ),
-        )
-    }
-}
-
-@Composable
-private fun DomainRow(domain: String, onDomain: (String) -> Unit) {
-    val c = LocalComixColors.current
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBadge(Lucide.Globe, c.text2)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text("Domain", style = TextStyle(fontFamily = Poppins, fontSize = 14.sp, fontWeight = FontWeight.Medium), color = c.textEmphasis)
-            Text("Logins are separate per domain", style = TextStyle(fontFamily = Poppins, fontSize = 12.sp), color = c.text3)
-        }
-        Row(
-            Modifier.clip(RoundedCornerShape(6.dp)).background(c.bg2).padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Site.DOMAINS.forEach { d ->
-                val on = d == domain
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (on) c.surface3 else c.bg2)
-                        .clickable { if (!on) onDomain(d) }
-                        .padding(PaddingValues(horizontal = 10.dp, vertical = 6.dp)),
-                ) {
-                    Text(
-                        d,
-                        style = TextStyle(fontFamily = Poppins, fontSize = 12.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal),
-                        color = if (on) c.textEmphasis else c.text3,
-                    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        BROWSE_SHORTCUTS.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { (label, icon, path) ->
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(c.surface)
+                            .clickable { onOpen(path) }
+                            .heightIn(min = 52.dp)
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconBadge(icon, c.text2)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            label,
+                            style = TextStyle(fontFamily = Poppins, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                            color = c.textEmphasis,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-    }
-}
-
-@Composable
-private fun IconBadge(icon: ImageVector, tint: androidx.compose.ui.graphics.Color) {
-    val c = LocalComixColors.current
-    Box(Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(16.dp))
     }
 }
 

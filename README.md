@@ -88,19 +88,19 @@ Google blocks its sign-in inside apps that display web pages, so the button is h
 <details>
 <summary><b>comix.ws is down. Does the app still work?</b></summary>
 <br>
-Yes. It retries on comix.to automatically for the rest of the session. The two domains keep separate logins, so you may need to log in again there. The domain can also be switched by hand in More → Settings.
+Yes. It retries on comix.to automatically for the rest of the session. The two domains keep separate logins, so you may need to log in again there. The domain can also be switched by hand in More → App settings.
 </details>
 
 <details>
 <summary><b>Something looks off after a site update</b></summary>
 <br>
-The app hooks into parts of the site, and a daily check flags when comix changes them, so fixes usually follow quickly. In the meantime, turning off <b>Mobile optimizations</b> in More → Settings shows the site's own layout.
+The app hooks into parts of the site, and a daily check flags when comix changes them, so fixes usually follow quickly. In the meantime, turning off <b>Mobile optimizations</b> in More → App settings shows the site's own layout.
 </details>
 
 <details>
 <summary><b>Where are the settings?</b></summary>
 <br>
-While reading, the gear in the reader controls opens every reader option in one sheet: tapping, volume keys, zoom, full screen, controls layout and the site's own reader settings. The More tab has the same reader options plus home page blocks, ad blocking, mobile optimizations, domain and cache. The site's general settings (theme, content filter) open from More → Theme & content filter, as a sheet you swipe down to close.
+While reading, the gear in the reader controls opens every reader option in one sheet: tapping, volume keys, zoom, full screen, controls layout and the site's own reader settings. More → App settings has the same reader options plus home page blocks, mobile optimizations, the back animation and its speed, ad blocking, domain and cache. The site's general settings (theme, content filter) open from More → Theme & content filter, as a sheet you swipe down to close.
 </details>
 
 <details>

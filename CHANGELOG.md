@@ -18,6 +18,18 @@ Theme & content filter:
 
 - Opens as a bottom sheet that closes with a swipe down or Back
 
+More:
+
+- Shorter: account, browse shortcuts in a grid, settings and about
+- App options moved to their own App settings page
+- Notifications and Backup left the account list; they're in the top bar and on the profile page
+
+App settings:
+
+- Back animation can be turned off
+- Back animation speed: fast, normal or slow
+- Clear cache shows how much space the cache uses and how much was freed
+
 ## 1.5.0
 
 Reader:

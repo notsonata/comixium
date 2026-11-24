@@ -1,5 +1,6 @@
 package com.notsonata.comixium.ui
 
+import com.notsonata.comixium.BuildConfig
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -119,7 +120,7 @@ class ChromeScreenshotTest {
         Frame(ComixColors(), {
             ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {})
         }, AppTab.MORE) {
-            MoreScreen(AuthState.LOGGED_OUT, "comix.ws", true, 37, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), appPrefs(), {}, {}, {})
+            MoreScreen(AuthState.LOGGED_OUT, {}, {}, {}, {}, {}, {}, version = BuildConfig.VERSION_NAME.removeSuffix("-debug"))
         }
     }
 
@@ -127,7 +128,15 @@ class ChromeScreenshotTest {
         Frame(light, {
             ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {})
         }, AppTab.MORE) {
-            MoreScreen(AuthState.LOGGED_IN, "comix.to", false, 0, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), appPrefs(), {}, {}, {})
+            MoreScreen(AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {}, version = BuildConfig.VERSION_NAME.removeSuffix("-debug"))
+        }
+    }
+
+    @Test fun settings() = shot("settings") {
+        Frame(ComixColors(), {
+            ComixTopBar("Settings", showBack = true, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {})
+        }, AppTab.MORE) {
+            SettingsScreen(readerPrefs(), appPrefs(), "comix.ws", true, 37, "48 MB", false, {}, {}, {}, {}, {})
         }
     }
 

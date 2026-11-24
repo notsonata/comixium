@@ -1,5 +1,6 @@
 package com.notsonata.comixium.ui
 
+import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -75,6 +77,9 @@ private fun AppContent(engine: WebEngine) {
     var selected by rememberSaveable { mutableStateOf(AppTab.HOME) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var morePageOpen by rememberSaveable { mutableStateOf(false) }
+    /** The native Settings page, one level below More (a web page opened from More sits above both). */
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    val moreScroll = rememberScrollState()
     /** Tab to go back to once a login started from its "log in" prompt succeeds. */
     var returnAfterLogin by rememberSaveable { mutableStateOf<AppTab?>(null) }
     val visited = rememberSaveable(saver = listSaver(), init = { mutableStateListOf(AppTab.HOME) })
@@ -118,7 +123,7 @@ private fun AppContent(engine: WebEngine) {
     fun select(t: AppTab) {
         if (t == selected) {
             when {
-                t == AppTab.MORE -> morePageOpen = false
+                t == AppTab.MORE -> { morePageOpen = false; settingsOpen = false }
                 else -> webTab(t).goRoot()
             }
             return
@@ -167,27 +172,29 @@ private fun AppContent(engine: WebEngine) {
         if (searchOpen) { searchOpen = false; return true }
         if (current?.handleBack() == true) return true
         if (selected == AppTab.MORE && morePageOpen) { morePageOpen = false; moreSheet = false; return true }
+        if (selected == AppTab.MORE && settingsOpen) { settingsOpen = false; return true }
         if (selected != AppTab.HOME) { selected = AppTab.HOME; return true }
         return false
     }
 
     val canHandleBack = searchOpen || current?.canGoBack == true || current?.dialogOpen == true ||
-        (selected == AppTab.MORE && morePageOpen) || selected != AppTab.HOME
+        (selected == AppTab.MORE && (morePageOpen || settingsOpen)) || selected != AppTab.HOME
     // Predictive back (Android 14+): the page follows the finger 1:1 (shrinks a little and slides
-    // toward the swipe), then settles in ~90 ms on release or springs back fast on cancel.
+    // toward the swipe), then settles on release (speed from settings) or springs back on cancel.
+    // With the back animation off there's no preview: Back just changes the page on release.
     val backAnim = remember { Animatable(0f) }
     var backFromLeft by remember { mutableStateOf(true) }
     val backScope = rememberCoroutineScope()
     PredictiveBackHandler(enabled = canHandleBack) { events ->
         try {
             // Closing a popup or search isn't a page change: no preview for those.
-            val preview = !searchOpen && current?.dialogOpen != true
+            val preview = engine.appPrefs.backAnimation && !searchOpen && current?.dialogOpen != true
             events.collect { e ->
                 backFromLeft = e.swipeEdge == BackEventCompat.EDGE_LEFT
                 if (preview) backAnim.snapTo(BACK_EASING.transform(e.progress))
             }
             back()
-            backScope.launch { backAnim.animateTo(0f, tween(90, easing = LinearOutSlowInEasing)) }
+            backScope.launch { backAnim.animateTo(0f, tween(engine.appPrefs.backSettleMillis, easing = LinearOutSlowInEasing)) }
         } catch (e: CancellationException) {
             backScope.launch { backAnim.animateTo(0f, spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow)) }
             throw e
@@ -204,12 +211,14 @@ private fun AppContent(engine: WebEngine) {
                 val atRoot = current?.isAtRoot ?: true
                 val title = when {
                     moreSheet && selected == AppTab.MORE && morePageOpen -> "Theme & content filter"
+                    selected == AppTab.MORE && settingsOpen && current == null -> "Settings"
                     current == null -> selected.label
                     else -> current.displayTitle.ifBlank { if (atRoot) selected.label else "" }
                 }
                 ComixTopBar(
                     title = title,
-                    showBack = current != null && (current.canGoBack || (selected == AppTab.MORE && morePageOpen)),
+                    showBack = if (current == null) selected == AppTab.MORE && settingsOpen
+                    else current.canGoBack || (selected == AppTab.MORE && morePageOpen),
                     showBrand = selected == AppTab.HOME && current != null && atRoot,
                     auth = auth,
                     onBack = { back() },
@@ -257,27 +266,47 @@ private fun AppContent(engine: WebEngine) {
                 WebTabView(moreTab, engine, Modifier.fillMaxSize().zIndex(if (visible) 1f else 0f), visible = visible)
             }
             if (selected == AppTab.MORE && !morePageOpen) Box(Modifier.fillMaxSize().zIndex(2f)) {
-                MoreScreen(
-                    auth = auth,
-                    domain = engine.domain,
-                    adBlockOn = engine.adBlockEnabled,
-                    blockedCount = engine.blockedCount,
-                    onOpen = ::openInMore,
-                    onLogin = { siteAction("openLogin") },
-                    onRegister = { siteAction("openRegister") },
-                    onSignOut = { siteAction("signOut") },
-                    onSiteSettings = ::openSiteSettings,
-                    onAdBlock = engine::updateAdBlock,
-                    onDomain = engine::switchDomain,
-                    reader = engine.reader,
-                    app = engine.appPrefs,
-                    onPagePrefsChanged = engine::pushPagePrefs,
-                    onMobileOptimizations = engine::setMobileOptimizations,
-                    onClearCache = {
-                        engine.clearCache()
-                        Toast.makeText(context, "Cache cleared", Toast.LENGTH_SHORT).show()
-                    },
-                )
+                if (settingsOpen) {
+                    var cacheSize by remember { mutableStateOf<String?>(null) }
+                    var clearing by remember { mutableStateOf(false) }
+                    val scope = rememberCoroutineScope()
+                    LaunchedEffect(Unit) { cacheSize = Formatter.formatShortFileSize(context, engine.cacheBytes()) }
+                    SettingsScreen(
+                        reader = engine.reader,
+                        app = engine.appPrefs,
+                        domain = engine.domain,
+                        adBlockOn = engine.adBlockEnabled,
+                        blockedCount = engine.blockedCount,
+                        cacheSize = cacheSize,
+                        clearing = clearing,
+                        onPagePrefsChanged = engine::pushPagePrefs,
+                        onMobileOptimizations = engine::setMobileOptimizations,
+                        onAdBlock = engine::updateAdBlock,
+                        onDomain = engine::switchDomain,
+                        onClearCache = {
+                            clearing = true
+                            scope.launch {
+                                val freed = engine.clearCache()
+                                val msg = if (freed < 1024) "Cache cleared, nothing to free"
+                                else "Cache cleared, ${Formatter.formatShortFileSize(context, freed)} freed"
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                cacheSize = Formatter.formatShortFileSize(context, engine.cacheBytes())
+                                clearing = false
+                            }
+                        },
+                    )
+                } else {
+                    MoreScreen(
+                        auth = auth,
+                        onOpen = ::openInMore,
+                        onLogin = { siteAction("openLogin") },
+                        onRegister = { siteAction("openRegister") },
+                        onSignOut = { siteAction("signOut") },
+                        onSiteSettings = ::openSiteSettings,
+                        onSettings = { settingsOpen = true },
+                        scroll = moreScroll,
+                    )
+                }
             }
             if (selected.needsLogin && auth == AuthState.LOGGED_OUT) Box(Modifier.fillMaxSize().zIndex(2f)) {
                 val from = selected
