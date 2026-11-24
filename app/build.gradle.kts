@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+// Bump this (and only this) to release a new version. CI tags the release v<appVersion>,
+// and versionCode follows automatically (1.2.3 -> 10203) so every bump installs as an update.
+val appVersion = "1.0.0"
+val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
+    major * 10_000 + minor * 100 + patch
+}
+
 // The release key lives in the (private) repo on purpose: this is a single-user,
 // sideloaded app, and a stable key lets every new APK install over the previous one.
 val signingProps = Properties().apply {
@@ -23,8 +30,8 @@ android {
         applicationId = "com.notsonata.comixium"
         minSdk = 26
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersion
     }
 
     signingConfigs {

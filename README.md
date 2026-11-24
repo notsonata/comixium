@@ -26,7 +26,7 @@ regenerate them with `./gradlew recordRoborazziDebug`.
 
 ## Install
 
-Download `comixium.apk` from the [latest release](../../releases/latest) and open it on your
+Download `comixium-<version>.apk` from the [latest release](../../releases/latest) and open it on your
 phone (allow installs from your browser/files app when Android asks). New builds install over
 old ones; your login and settings are kept.
 
@@ -36,6 +36,13 @@ comix's ads are mostly first-party: an invisible full-screen link that opens a p
 first tap, plus promo banners. The injected script removes the popunder link and the stylesheet
 hides the banners. Third-party ad and tracker hosts are blocked at the network level. External
 sites only open (in a Custom Tab) when you actually tapped a link; scripted redirects are dropped.
+
+## Versions
+
+Each merge to `main` publishes a GitHub release named after the app version (tag `v1.0.0`,
+title "Comixium 1.0.0", asset `comixium-1.0.0.apk`), with the merged pull requests listed in
+its notes. To ship a new version, bump `appVersion` in `app/build.gradle.kts`; `versionCode`
+follows from it. A merge that doesn't bump the version rebuilds that version's release.
 
 ## Build
 
@@ -58,7 +65,7 @@ lets updates install in place.
 | `app/src/main/assets/inject` | Script + stylesheet injected into site pages (ad removal, state reporting, helpers) |
 | `app/src/main/assets/adblock` | Bundled tracker/ad host list (StevenBlack unified hosts, MIT) |
 | `app/signing` | Release keystore and its properties |
-| `.github/workflows/android.yml` | CI: tests, signed APK, rolling `latest` release on `main` |
+| `.github/workflows/android.yml` | CI: tests, signed APK, versioned release on every merge to `main` |
 
 ## Third-party
 
