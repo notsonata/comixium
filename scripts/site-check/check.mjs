@@ -42,18 +42,24 @@ const challenged = () => page.evaluate(() =>
   !!document.querySelector('#challenge-form, #challenge-running, iframe[src*="challenges.cloudflare.com"]:not(.auth iframe)'),
 ).catch(() => true);
 
-/** Loads a page, waiting out Cloudflare challenges. Returns true if the real page loaded. */
+/**
+ * Loads a page, waiting out Cloudflare challenges. Returns true if the real page loaded.
+ * Bounded so a runner stuck behind challenges can't run for long: two attempts per page, and once
+ * the overall budget is spent, the remaining pages are skipped.
+ */
+const started = Date.now();
+const BUDGET_MS = 9 * 60 * 1000;
 async function open(path) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await page.goto(BASE + path, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
-    for (let i = 0; i < 25 && await challenged(); i++) await wait(1000); // challenges usually clear in a few seconds
+  for (let attempt = 0; attempt < 2 && Date.now() - started < BUDGET_MS; attempt++) {
+    await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    for (let i = 0; i < 15 && await challenged(); i++) await wait(1000); // challenges usually clear in a few seconds
     if (!(await challenged())) {
-      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
       await wait(1500);
       blockedSection = false;
       return true;
     }
-    await wait(10000);
+    await wait(5000);
   }
   blockedSection = true; // checks in this section are reported as skipped
   return false;
