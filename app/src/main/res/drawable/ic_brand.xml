@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher mark cropped to the speech bubble, for the top bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="50"
+    android:viewportHeight="50">
+    <group android:translateX="-29" android:translateY="-30.5">
+        <path
+            android:fillColor="#66E8FA"
+            android:pathData="M40,32H68A10,10 0 0,1 78,42V60A10,10 0 0,1 68,70H48L37,79L39,70H40A10,10 0 0,1 30,60V42A10,10 0 0,1 40,32Z" />
+        <path
+            android:strokeColor="#22282A"
+            android:strokeWidth="5.5"
+            android:strokeLineCap="round"
+            android:pathData="M61.07,43.93A10,10 0 1,0 61.07,58.07" />
+    </group>
+</vector>

@@ -168,6 +168,16 @@
     report: function () { last = ''; report(); },
     openSettings: function () { return click('.topnav .settings button'); },
     openLogin: function () { return click('.topnav .login-btn'); },
+    openRegister: function () {
+      if (!click('.topnav .login-btn')) return false;
+      setTimeout(function () {
+        var links = document.querySelectorAll('.auth__foot .auth__link, .auth .auth__link');
+        for (var i = 0; i < links.length; i++) {
+          if (/create an account/i.test(links[i].textContent)) { links[i].click(); break; }
+        }
+      }, 200);
+      return true;
+    },
     openUserMenu: function () { return click('.topnav .usermenu button, .topnav .usermenu__btn'); },
     signOut: function () {
       if (!click('.topnav .usermenu__item--signout')) {
