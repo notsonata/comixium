@@ -105,8 +105,12 @@
   // The site's reader already toggles its controls on a double tap and turns pages on edge taps in
   // paged mode. On top of that: edge taps scroll a long strip, pinch zoom works on chapter pages,
   // and its keyboard-shortcut help is replaced by the app's touch-controls sheet.
+  // Mirrors the app's settings (pushed with setPrefs). Some are applied here (taps, zoom, controls
+  // layout, mobile layer); the rest (volume keys, full screen...) are only shown in the settings sheet.
   var prefs = {
-    tapEdges: true, pinchZoom: true, layout: 'rail', x: 'right', y: 'top', size: 'normal',
+    tapEdges: true, tapPaged: true, tapLayout: 'sides', tapZone: 'medium', invertTaps: false, controlsTap: 'double',
+    pinchZoom: true, layout: 'rail', x: 'right', y: 'top', size: 'normal',
+    volume: 'on', immersive: true, keepOn: true, longPress: true,
     mobile: true, announce: true, share: true
   };
   var DEFAULTS = { layout: 'rail', x: 'right', y: 'top', size: 'normal' };
@@ -165,14 +169,41 @@
     return true;
   }
 
-  // Edge taps in long-strip mode. Handled in the capture phase and stopped there, so quick
-  // repeated edge taps scroll repeatedly instead of reaching the reader as a double tap.
-  var tap = null, touches = 0;
+  // Reader taps. The app handles every one-finger tap on the page itself so each behaviour can be
+  // configured: edge zones (sides or top/bottom, three sizes, invertible) turn the page in paged
+  // mode or scroll a screen in long strip, and the middle shows/hides the reader controls with a
+  // double tap, a single tap, or not at all. The tap is kept from the reader's own handler, but its
+  // page-turn library (which tracks touches on document) still gets the touch end.
+  var tap = null, touches = 0, lastCenterTap = 0, redispatching = false;
+  var ZONES = { small: 0.2, medium: 0.25, large: 0.35 };
   function onPage(t) {
     return t && t.closest && t.closest('.rpage-main') && !t.closest('button, a, input, textarea, select, label');
   }
+  function toggleControls() {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true }));
+  }
+  function centerTap() {
+    if (prefs.controlsTap === 'off') return;
+    if (prefs.controlsTap === 'single') { toggleControls(); return; }
+    var now = Date.now();
+    if (now - lastCenterTap < 320) { lastCenterTap = 0; toggleControls(); } else lastCenterTap = now;
+  }
+  function tapZone(e, paged, r) {
+    var vv = window.visualViewport;
+    var fx = vv ? (e.clientX - vv.offsetLeft) / vv.width : e.clientX / window.innerWidth;
+    var fy = vv ? (e.clientY - vv.offsetTop) / vv.height : e.clientY / window.innerHeight;
+    var z = ZONES[prefs.tapZone] || 0.25;
+    var zone;
+    if (prefs.tapLayout === 'vertical') {
+      zone = fy < z ? -1 : fy > 1 - z ? 1 : 0;
+    } else {
+      zone = fx < z ? -1 : fx > 1 - z ? 1 : 0;
+      if (paged && r.classList.contains('rpage--rtl')) zone = -zone; // right-to-left books: left is next
+    }
+    return prefs.invertTaps ? -zone : zone;
+  }
   window.addEventListener('pointerdown', function (e) {
-    if (e.pointerType !== 'touch') return;
+    if (redispatching || e.pointerType !== 'touch') return;
     touches++;
     tap = touches === 1 && onPage(e.target) ? { x: e.clientX, y: e.clientY, t: Date.now(), id: e.pointerId } : null;
   }, true);
@@ -181,32 +212,100 @@
     tap = null;
   }, true);
   window.addEventListener('pointerup', function (e) {
-    if (e.pointerType !== 'touch') return;
+    if (redispatching || e.pointerType !== 'touch') return;
     touches = Math.max(0, touches - 1);
     var t = tap;
     tap = null;
-    if (!t || e.pointerId !== t.id || !prefs.tapEdges) return;
+    if (!t || e.pointerId !== t.id) return;
     if (Math.abs(e.clientX - t.x) > 10 || Math.abs(e.clientY - t.y) > 10 || Date.now() - t.t > 350) return;
     var r = document.querySelector('.rpage');
-    if (!r || !r.classList.contains('rpage--long-strip')) return; // paged: the reader's own edge taps apply
-    var vv = window.visualViewport;
-    var f = vv ? (e.clientX - vv.offsetLeft) / vv.width : e.clientX / window.innerWidth;
-    var dir = f < 0.25 ? -1 : f > 0.75 ? 1 : 0;
-    if (!dir) return;
+    if (!r) return;
     e.stopPropagation();
-    readerStep(dir);
+    redispatching = true;
+    try {
+      document.dispatchEvent(new PointerEvent('pointerup', {
+        pointerId: e.pointerId, pointerType: 'touch', isPrimary: e.isPrimary,
+        clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY, button: e.button
+      }));
+    } finally { redispatching = false; }
+    var paged = !r.classList.contains('rpage--long-strip');
+    var zone = tapZone(e, paged, r);
+    if (zone !== 0 && (paged ? prefs.tapPaged : prefs.tapEdges)) { readerStep(zone); return; }
+    centerTap();
   }, true);
 
-  // The reader's help button lists keyboard shortcuts; show the app's touch-controls sheet instead.
-  document.addEventListener('click', function (e) {
-    var b = e.target && e.target.closest ? e.target.closest('.rpage-floatctl button') : null;
-    if (!b) return;
-    var label = (b.getAttribute('aria-label') || b.getAttribute('title') || '').trim();
-    if (!/^help$/i.test(label)) return;
+  // --- One settings sheet: the app's reader options inside the site's own settings panel --------
+  // The reader's gear opens the site's settings (a bottom sheet with mobile optimizations); these
+  // sections are appended to it in the same markup, so there is one place for every reader option.
+  // Changes apply here at once and are sent to the app, which stores them and syncs other pages.
+  var ON_OFF = [[true, 'On'], [false, 'Off']];
+  var SETTINGS = [
+    ['Tap to turn pages (paged)', 'tapPaged', ON_OFF],
+    ['Tap to scroll (long strip)', 'tapEdges', ON_OFF],
+    ['Tap zones', 'tapLayout', [['sides', 'Left & right'], ['vertical', 'Top & bottom']]],
+    ['Tap zone size', 'tapZone', [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']]],
+    ['Tap direction', 'invertTaps', [[false, 'Normal'], [true, 'Inverted']]],
+    ['Show controls with', 'controlsTap', [['double', 'Double tap'], ['single', 'Single tap'], ['off', 'Off']]],
+    ['Volume keys', 'volume', [['on', 'Normal'], ['inverted', 'Inverted'], ['off', 'Off']]],
+    ['Pinch to zoom', 'pinchZoom', ON_OFF],
+    ['Long-press a page', 'longPress', [[true, 'Image menu'], [false, 'Nothing']]],
+    ['Full screen', 'immersive', ON_OFF],
+    ['Keep screen on', 'keepOn', ON_OFF],
+    ['Controls layout', 'layout', [['rail', 'Rail'], ['bar', 'Bar'], ['minimal', 'Minimal']]],
+    ['Controls position', 'y', [['top', 'Top'], ['bottom', 'Bottom']]],
+    ['Controls side', 'x', [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]],
+    ['Controls size', 'size', [['normal', 'Normal'], ['large', 'Large']]]
+  ];
+  var GESTURES_HINT = 'Swipe to turn pages or scroll, pinch to zoom, tap or drag the progress bar to jump, ' +
+    'and use Back to leave the chapter. Tap zones and the controls tap work as set above.';
+  function renderSettings() {
+    var out = '';
+    for (var i = 0; i < SETTINGS.length; i++) {
+      var key = SETTINGS[i][1];
+      if (key === 'x' && prefs.layout === 'bar') continue; // the bar always spans the width
+      out += '<section class="rpage-settings__group cx-setting" data-key="' + key + '">' +
+        '<h3 class="rpage-settings__title mono">' + SETTINGS[i][0] + '</h3><div class="rpage-settings__opts">';
+      var opts = SETTINGS[i][2];
+      for (var j = 0; j < opts.length; j++) {
+        out += '<label class="rpage-opt' + (prefs[key] === opts[j][0] ? ' is-on' : '') + '" data-v="' + opts[j][0] + '">' +
+          '<span class="rpage-opt__dot" aria-hidden="true"></span><span>' + opts[j][1] + '</span></label>';
+      }
+      out += '</div></section>';
+    }
+    return out + '<p class="rpage-settings__hint">' + GESTURES_HINT + '</p>';
+  }
+  function onSettingClick(e) {
+    var opt = e.target.closest && e.target.closest('.cx-setting .rpage-opt');
+    if (!opt) return;
     e.preventDefault();
-    e.stopImmediatePropagation();
-    post({ t: 'readerHelp' });
-  }, true);
+    e.stopPropagation();
+    var key = opt.closest('.cx-setting').getAttribute('data-key');
+    var raw = opt.getAttribute('data-v');
+    var value = raw === 'true' ? true : raw === 'false' ? false : raw;
+    var change = {};
+    change[key] = value;
+    window.__comixium.setPrefs(change);
+    post({ t: 'pref', key: key, value: value });
+  }
+  function readerSettingsSections() {
+    var body = document.querySelector('.rpage-settings__body');
+    if (!body) return;
+    var box = body.querySelector(':scope > #cx-reader-settings');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'cx-reader-settings';
+      box.addEventListener('click', onSettingClick);
+      body.appendChild(box);
+    }
+    var html = renderSettings();
+    if (box.__html !== html) { box.innerHTML = html; box.__html = html; }
+    // The site's own "Hide controls: single / double tap" no longer applies (the app handles
+    // those taps; see "Show controls with"), so hide it rather than show two settings for one thing.
+    var titles = body.querySelectorAll(':scope > .rpage-settings__group > .rpage-settings__title');
+    for (var i = 0; i < titles.length; i++) {
+      if (/^hide controls$/i.test(titles[i].textContent.trim())) titles[i].parentElement.classList.add('cx-hidden');
+    }
+  }
 
   // Pinch zoom: the site locks zoom with its viewport tag; relax it on chapter pages only.
   var originalViewport = null;
@@ -346,8 +445,24 @@
     if (document.querySelector('.topnav .login-btn')) return 'out';
     return '';
   }
+  // Anything Back should close before leaving the page: dialogs, sheets, menus, dropdowns, panels.
+  var OVERLAYS = [
+    '.auth', '.settings-dialog', '.minidlg', '[role="dialog"][aria-modal="true"]',
+    '[role="menu"]', '[role="listbox"]', '.fdrop__pop', '.nav-menu__pop', '.browse-pop',
+    '.usermenu__pop', '.notifpop', '.search-pop', '.rpage-cmpanel.is-open'
+  ].join(', ');
+  function isShown(el) {
+    if (!el.isConnected || !el.getClientRects().length) return false;
+    var cs = window.getComputedStyle(el);
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0';
+  }
+  function openOverlay() {
+    var els = document.querySelectorAll(OVERLAYS);
+    for (var i = els.length - 1; i >= 0; i--) if (isShown(els[i])) return els[i]; // topmost last
+    return null;
+  }
   function dialogOpen() {
-    return !!document.querySelector('.auth, .settings-dialog, [role="dialog"][aria-modal="true"]');
+    return !!openOverlay();
   }
   function snapshot() {
     var b = document.body;
@@ -371,6 +486,7 @@
     fixHover();
     markScrollers();
     homeBlocks();
+    readerSettingsSections();
     var s = snapshot();
     var key = JSON.stringify(s);
     if (key !== last) { last = key; post(s); }
@@ -415,6 +531,7 @@
     }
   }
   new MutationObserver(function (records) {
+    var urgent = false;
     for (var i = 0; i < records.length; i++) {
       var added = records[i].addedNodes;
       for (var j = 0; j < added.length; j++) {
@@ -422,8 +539,16 @@
         if (n.nodeType !== 1) continue;
         if (n.tagName === 'A' && isTrap(n)) zap(n);
         else if (n.tagName === 'HTML' || n.tagName === 'HEAD' || n.tagName === 'BODY') watchRoots();
+        else if (n.matches(OVERLAYS) || n.querySelector(OVERLAYS)) urgent = true;
+      }
+      var removed = records[i].removedNodes;
+      for (var k = 0; k < removed.length && !urgent; k++) {
+        var m = removed[k];
+        if (m.nodeType === 1 && (m.matches(OVERLAYS) || m.querySelector(OVERLAYS))) urgent = true;
       }
     }
+    // Popups opening or closing are reported right away, so Back knows about them immediately.
+    if (urgent) { readerSettingsSections(); setTimeout(report, 0); }
     schedule();
   }).observe(document, { childList: true, subtree: true });
   watchRoots();
@@ -468,11 +593,27 @@
       }
       return true;
     },
+    // Closes the topmost popup: its own close button, else Escape, else a press outside it.
     closeDialog: function () {
-      if (click('.auth__close') || click('.settings-dialog__close')) return true;
-      var d = dialogOpen();
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
-      return d;
+      var o = openOverlay();
+      if (!o) return false;
+      var btn = o.querySelector('.auth__close, .settings-dialog__close, .rpage-modal__close, [aria-label^="Close"], [aria-label^="close"]');
+      if (btn) { btn.click(); return true; }
+      if (o.matches('.rpage-cmpanel')) {
+        var toggle = document.querySelector('.rpage-floatctl button[aria-label="Toggle comments"]');
+        if (toggle) { toggle.click(); return true; }
+      }
+      if (o.matches('.minidlg')) { o.click(); return true; } // its backdrop closes it
+      var esc = { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true, cancelable: true };
+      (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', esc));
+      setTimeout(function () {
+        if (openOverlay() !== o) return;
+        // Popovers that close on a press outside them.
+        document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      }, 60);
+      return true;
     },
     readerStep: readerStep,
     setPrefs: function (p) {
@@ -483,6 +624,7 @@
       fixHover();
       markScrollers();
       homeBlocks();
+      readerSettingsSections();
       return true;
     },
     scrollByPage: function (dir) {

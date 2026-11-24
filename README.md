@@ -29,7 +29,7 @@
 **Feels like an app, not a website**
 
 - Bottom tabs for Home, Browse, Library, History and More, each remembering where you were
-- Native top bar, search with recent searches, and Back that goes where you expect
+- Native top bar, search with recent searches, and Back that goes where you expect (popups close first)
 - Pull to refresh, proper offline and site-down screens
 - Switches to comix.to automatically when comix.ws is down
 
@@ -37,8 +37,10 @@
 
 - Full screen chapters that keep the screen awake
 - Double tap to show the controls, tap the edges to turn pages or scroll, pinch to zoom
-- Volume keys turn pages
+- Tapping is fully adjustable: zones on the sides or top and bottom, three sizes, inverted, or off
+- Volume keys turn pages, normal or inverted
 - Reader controls can be moved and resized: rail, bar or minimal; top or bottom; left, center or right
+- Every reader option in one settings sheet, opened from the gear while reading
 
 **No ads**
 
@@ -98,7 +100,7 @@ The app hooks into parts of the site, and a daily check flags when comix changes
 <details>
 <summary><b>Where are the settings?</b></summary>
 <br>
-In the More tab: reader options, reader controls layout, home page blocks, ad blocking, mobile optimizations, domain and cache. The site's own settings (theme, content filter) open from the gear icon in the top bar.
+While reading, the gear in the reader controls opens every reader option in one sheet: tapping, volume keys, zoom, full screen, controls layout and the site's own reader settings. The More tab has the same reader options plus home page blocks, ad blocking, mobile optimizations, domain and cache. The site's general settings (theme, content filter) open from the gear in the top bar.
 </details>
 
 <details>

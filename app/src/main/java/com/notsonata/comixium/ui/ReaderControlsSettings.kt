@@ -48,7 +48,7 @@ fun ReaderControlsSettings(reader: ReaderPrefs, onChanged: () -> Unit) {
 }
 
 @Composable
-private fun Choice(
+internal fun Choice(
     label: String,
     note: String?,
     options: List<Pair<String, String>>,

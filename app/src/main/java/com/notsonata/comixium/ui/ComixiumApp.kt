@@ -160,9 +160,11 @@ private fun AppContent(engine: WebEngine) {
     val backScope = rememberCoroutineScope()
     PredictiveBackHandler(enabled = canHandleBack) { events ->
         try {
+            // Closing a popup or search isn't a page change: no preview for those.
+            val preview = !searchOpen && current?.dialogOpen != true
             events.collect { e ->
                 backFromLeft = e.swipeEdge == BackEventCompat.EDGE_LEFT
-                backAnim.snapTo(BACK_EASING.transform(e.progress))
+                if (preview) backAnim.snapTo(BACK_EASING.transform(e.progress))
             }
             back()
             backScope.launch { backAnim.animateTo(0f, tween(90, easing = LinearOutSlowInEasing)) }
@@ -266,14 +268,6 @@ private fun AppContent(engine: WebEngine) {
                 )
             }
         }
-    }
-
-    if (engine.readerHelpOpen) {
-        ReaderHelpSheet(
-            reader = engine.reader,
-            onChanged = engine::pushPagePrefs,
-            onDismiss = { engine.readerHelpOpen = false },
-        )
     }
 
     if (searchOpen) {

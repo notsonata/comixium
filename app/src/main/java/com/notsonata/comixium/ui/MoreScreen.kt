@@ -94,29 +94,54 @@ fun MoreScreen(
         }
         Section("READER") {
             ToggleRow(
-                Lucide.Expand, "Full screen",
-                subtitle = "Hide the status and navigation bars while reading",
-                checked = reader.immersive, onChange = reader::updateImmersive,
+                Lucide.Expand, "Full screen", subtitle = "Hide the status and navigation bars while reading",
+                checked = reader.immersive, onChange = { reader.updateImmersive(it); onPagePrefsChanged() },
             )
             ToggleRow(
-                Lucide.Volume, "Volume keys turn pages",
-                subtitle = "Down = next, up = previous; uses your reader scroll distance",
-                checked = reader.volumeKeys, onChange = reader::updateVolumeKeys,
+                Lucide.Sun, "Keep screen on", subtitle = "While a chapter is open",
+                checked = reader.keepScreenOn, onChange = { reader.updateKeepScreenOn(it); onPagePrefsChanged() },
             )
             ToggleRow(
-                Lucide.Sun, "Keep screen on",
-                subtitle = "While a chapter is open",
-                checked = reader.keepScreenOn, onChange = reader::updateKeepScreenOn,
+                Lucide.ZoomIn, "Pinch to zoom", subtitle = "On chapter pages",
+                checked = reader.pinchZoom, onChange = { reader.updatePinchZoom(it); onPagePrefsChanged() },
             )
             ToggleRow(
-                Lucide.Hand, "Tap edges to scroll",
-                subtitle = "Long strip: tap the left or right edge to move a screen",
-                checked = reader.tapEdges, onChange = reader::updateTapEdges,
+                Lucide.Download, "Long-press image menu", subtitle = "Save, share or copy a page",
+                checked = reader.longPressMenu, onChange = { reader.updateLongPressMenu(it); onPagePrefsChanged() },
+            )
+        }
+        Section("TAPPING") {
+            ToggleRow(
+                Lucide.Hand, "Tap to turn pages", subtitle = "Paged mode: tap the edges",
+                checked = reader.tapPaged, onChange = { reader.updateTapPaged(it); onPagePrefsChanged() },
             )
             ToggleRow(
-                Lucide.ZoomIn, "Pinch to zoom",
-                subtitle = "On chapter pages",
-                checked = reader.pinchZoom, onChange = reader::updatePinchZoom,
+                Lucide.Hand, "Tap to scroll", subtitle = "Long strip: tap the edges to move a screen",
+                checked = reader.tapEdges, onChange = { reader.updateTapEdges(it); onPagePrefsChanged() },
+            )
+            Choice("Tap zones", null, listOf("sides" to "Left & right", "vertical" to "Top & bottom"), reader.tapLayout) {
+                reader.updateTapLayout(it); onPagePrefsChanged()
+            }
+            Choice("Tap zone size", null, listOf("small" to "Small", "medium" to "Medium", "large" to "Large"), reader.tapZone) {
+                reader.updateTapZone(it); onPagePrefsChanged()
+            }
+            ToggleRow(
+                Lucide.Refresh, "Invert tap zones", subtitle = "Left / top goes forward",
+                checked = reader.invertTaps, onChange = { reader.updateInvertTaps(it); onPagePrefsChanged() },
+            )
+            Choice(
+                "Show controls with", "A tap in the middle of the page",
+                listOf("double" to "Double tap", "single" to "Single tap", "off" to "Off"), reader.controlsTap,
+            ) { reader.updateControlsTap(it); onPagePrefsChanged() }
+        }
+        Section("VOLUME KEYS") {
+            ToggleRow(
+                Lucide.Volume, "Volume keys turn pages", subtitle = "Uses your reader scroll distance",
+                checked = reader.volumeKeys, onChange = { reader.updateVolumeKeys(it); onPagePrefsChanged() },
+            )
+            ToggleRow(
+                Lucide.Refresh, "Invert volume keys", subtitle = "Volume up goes forward",
+                checked = reader.invertVolume, onChange = { reader.updateInvertVolume(it); onPagePrefsChanged() },
             )
         }
         Section("READER CONTROLS") {

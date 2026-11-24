@@ -137,12 +137,6 @@ class ChromeScreenshotTest {
         }, AppTab.LIBRARY) { LoginPrompt(AppTab.LIBRARY, {}, {}) }
     }
 
-    @Test fun touchControls() = shot("reader_touch_controls") {
-        Box(Modifier.fillMaxSize().background(ComixColors().surface)) {
-            TouchControls(readerPrefs(), onChanged = {}, modifier = Modifier.padding(top = 24.dp))
-        }
-    }
-
     @Test fun readerControlsSettings() = shot("reader_controls_settings") {
         val prefs = readerPrefs().apply { updateControlsLayout("bar"); updateControlsY("bottom"); updateControlsSize("large") }
         Box(Modifier.fillMaxSize().background(ComixColors().bg2).padding(top = 24.dp)) {

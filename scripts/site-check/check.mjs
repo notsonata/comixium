@@ -146,12 +146,19 @@ try {
         await page.touchscreen.tap(395, 500); await wait(900);
         check('Right-edge tap scrolls (long strip)', (await page.evaluate(() => scrollY)) > y1, '', 'edge taps');
       }
-      await page.evaluate(() => { const b = [...document.querySelectorAll('.rpage-floatctl button')].find(b => b.getAttribute('aria-label') === 'Help'); b && b.click(); });
-      await wait(500);
-      check('Help opens the app sheet, not the shortcut list', await page.evaluate(() => window.__msgs.some(m => m.t === 'readerHelp') && !/Keyboard shortcuts/i.test(document.body.innerText)), '', 'touch-controls sheet');
-      await page.click('.rpage-floatctl button[aria-label="Settings"]').catch(() => {}); await wait(700);
+      check('Help button hidden (settings live behind the gear)', await page.evaluate(() => { const b = document.querySelector('.rpage-floatctl button[aria-label="Help"]'); return !!b && !b.getClientRects().length; }), '', 'one settings button');
+      const h0 = await page.evaluate(() => document.querySelector('.rpage').classList.contains('rpage--chrome-hidden'));
+      await page.touchscreen.tap(206, 500); await wait(120); await page.touchscreen.tap(206, 500); await wait(600);
+      check('Double tap toggles controls (reader `x` shortcut)', (await page.evaluate(() => document.querySelector('.rpage').classList.contains('rpage--chrome-hidden'))) !== h0, '', 'show/hide controls');
+      if (await page.evaluate(() => document.querySelector('.rpage').classList.contains('rpage--chrome-hidden'))) {
+        await page.touchscreen.tap(206, 500); await wait(120); await page.touchscreen.tap(206, 500); await wait(600);
+      }
+      await page.evaluate(() => document.querySelector('.rpage-floatctl button[aria-label="Settings"]')?.click()); await wait(700);
       check('Reader settings open as a bottom sheet (`.minidlg`)', await page.evaluate(() => { const p = document.querySelector('.minidlg__panel'); return !!p && Math.abs(p.getBoundingClientRect().bottom - innerHeight) < 2; }), '', 'reader panels as bottom sheets');
-      await page.keyboard.press('Escape'); await wait(400);
+      check('App options inside the reader settings sheet', await page.evaluate(() => document.querySelectorAll('.rpage-settings__body #cx-reader-settings .cx-setting').length > 10), '', 'reader settings (taps, volume, controls)');
+      check('Reader settings sheet reported as a popup', (await lastState())?.dialog === true, '', 'Back closes popups first');
+      await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
+      check('Back helper closes the settings sheet', !(await page.$('.minidlg')), '', 'Back closes popups first');
       check('Pinch zoom enabled on chapters', await page.evaluate(() => /user-scalable=yes/.test(document.querySelector('meta[name=viewport]').content)), '', 'pinch zoom');
     }
   }

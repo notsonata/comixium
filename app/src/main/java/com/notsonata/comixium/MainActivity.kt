@@ -96,7 +96,8 @@ class MainActivity : ComponentActivity(), ActivityServices {
                 // Consume both down and up so the system volume doesn't change; act on presses
                 // and on every few repeats while held.
                 if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount % 3 == 0) {
-                    val dir = if (code == KeyEvent.KEYCODE_VOLUME_DOWN) 1 else -1
+                    val down = if (engine.reader.invertVolume) -1 else 1
+                    val dir = if (code == KeyEvent.KEYCODE_VOLUME_DOWN) down else -down
                     tab.js("window.__comixium && window.__comixium.readerStep($dir)")
                 }
                 return true

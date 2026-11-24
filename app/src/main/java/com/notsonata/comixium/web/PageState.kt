@@ -16,7 +16,7 @@ data class PageState(
     val theme: Map<String, String>,
 ) {
     companion object {
-        /** The message's "t" field ("state", "download", "readerHelp"...). */
+        /** The message's "t" field ("state", "download", "pref"). */
         fun type(json: String): String? = runCatching { JSONObject(json).optString("t") }.getOrNull()
 
         fun parse(json: String): PageState? = runCatching {
