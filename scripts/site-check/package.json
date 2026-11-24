@@ -1,0 +1,9 @@
+{
+  "name": "comixium-site-check",
+  "private": true,
+  "type": "module",
+  "description": "Loads the live site with the app's page script and checks every hook the app relies on.",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

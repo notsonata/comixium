@@ -1,0 +1,82 @@
+name: Site check
+
+# Loads the live site with the app's page script and checks every hook the app relies on.
+# A failing scheduled run opens (or updates) an issue listing what changed; it closes itself
+# once the check passes again.
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/src/main/assets/inject/**"
+      - "scripts/site-check/**"
+      - ".github/workflows/site-check.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ISSUE_TITLE: "Site check: comix changed something the app relies on"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        working-directory: scripts/site-check
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Check the live site
+        id: check
+        run: |
+          set +e
+          node scripts/site-check/check.mjs > report.md
+          code=$?
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the tracking issue
+        if: github.event_name != 'pull_request' && steps.check.outputs.code == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          num="$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number --jq '.[0].number')"
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body-file report.md
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file report.md
+          fi
+
+      - name: Close the tracking issue when passing again
+        if: github.event_name != 'pull_request' && steps.check.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for num in $(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number --jq '.[].number'); do
+            gh issue close "$num" --comment "Site check passing again on $(date -u +%F)."
+          done
+
+      - name: Result
+        env:
+          CODE: ${{ steps.check.outputs.code }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          case "$CODE" in
+            0) echo "All site checks passed." ;;
+            2)
+              if [ "$EVENT" = "pull_request" ]; then
+                echo "::error::The site could not be loaded from the runner."; exit 1
+              fi
+              echo "::warning::The site could not be loaded from the runner (Cloudflare challenge?). Skipped." ;;
+            *) echo "::error::The site check found problems; see the job summary."; exit 1 ;;
+          esac
