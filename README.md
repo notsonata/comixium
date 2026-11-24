@@ -13,6 +13,13 @@ Download `comixium.apk` from the [latest release](../../releases/latest) and ope
 phone (allow installs from your browser/files app when Android asks). New builds install over
 old ones; your login and settings are kept.
 
+## Ad blocking
+
+comix's ads are mostly first-party: an invisible full-screen link that opens a popunder on your
+first tap, plus promo banners. The injected script removes the popunder link and the stylesheet
+hides the banners. Third-party ad and tracker hosts are blocked at the network level. External
+sites only open (in a Custom Tab) when you actually tapped a link; scripted redirects are dropped.
+
 ## Build
 
 Requirements: JDK 17+ and the Android SDK (`ANDROID_HOME` set, or `sdk.dir` in `local.properties`).
@@ -30,9 +37,13 @@ lets updates install in place.
 | Path | What it is |
 | --- | --- |
 | `app/src/main/java/.../ui/theme` | Site design tokens (colours, Poppins / JetBrains Mono) as a Compose theme |
+| `app/src/main/java/.../web` | Web engine: tabs, link policy, ad blocker, domain fallback, page-state bridge |
+| `app/src/main/assets/inject` | Script + stylesheet injected into site pages (ad removal, state reporting, helpers) |
+| `app/src/main/assets/adblock` | Bundled tracker/ad host list (StevenBlack unified hosts, MIT) |
 | `app/signing` | Release keystore and its properties |
 | `.github/workflows/android.yml` | CI: tests, signed APK, rolling `latest` release on `main` |
 
 ## Third-party
 
 Poppins and JetBrains Mono are bundled under the SIL Open Font License; see `third_party/fonts/`.
+The ad/tracker host list is StevenBlack/hosts (MIT); see `third_party/adblock/`.
