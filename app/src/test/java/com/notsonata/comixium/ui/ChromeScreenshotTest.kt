@@ -31,6 +31,7 @@ import com.notsonata.comixium.ui.theme.ComixColors
 import com.notsonata.comixium.ui.theme.ComixiumTheme
 import com.notsonata.comixium.ui.theme.withSiteTheme
 import com.notsonata.comixium.web.AuthState
+import com.notsonata.comixium.web.AppPrefs
 import com.notsonata.comixium.web.ReaderPrefs
 import com.notsonata.comixium.web.RecentSearches
 import com.notsonata.comixium.web.WebError
@@ -57,6 +58,10 @@ class ChromeScreenshotTest {
 
     private fun readerPrefs() = ReaderPrefs(
         ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("reader", Context.MODE_PRIVATE),
+    )
+
+    private fun appPrefs() = AppPrefs(
+        ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("app", Context.MODE_PRIVATE),
     )
 
     private fun shot(name: String, colors: ComixColors = ComixColors(), content: @Composable () -> Unit) {
@@ -114,7 +119,7 @@ class ChromeScreenshotTest {
         Frame(ComixColors(), {
             ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_OUT, {}, {}, {}, {}, {}, {})
         }, AppTab.MORE) {
-            MoreScreen(AuthState.LOGGED_OUT, "comix.ws", true, 37, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), {})
+            MoreScreen(AuthState.LOGGED_OUT, "comix.ws", true, 37, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), appPrefs(), {}, {}, {})
         }
     }
 
@@ -122,7 +127,7 @@ class ChromeScreenshotTest {
         Frame(light, {
             ComixTopBar("More", showBack = false, showBrand = false, auth = AuthState.LOGGED_IN, {}, {}, {}, {}, {}, {})
         }, AppTab.MORE) {
-            MoreScreen(AuthState.LOGGED_IN, "comix.to", false, 0, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), {})
+            MoreScreen(AuthState.LOGGED_IN, "comix.to", false, 0, {}, {}, {}, {}, {}, {}, {}, readerPrefs(), appPrefs(), {}, {}, {})
         }
     }
 

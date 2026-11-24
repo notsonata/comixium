@@ -82,6 +82,14 @@ try {
   check('No full-screen popunder link left on the page', await page.evaluate(() => ![...document.querySelectorAll('body > a')].some(a => !a.textContent.trim() && getComputedStyle(a).position === 'fixed' && getComputedStyle(a).display !== 'none')), '', 'ad blocking');
   check('Promo banner hidden', await page.evaluate(() => ![...document.querySelectorAll('.home-banner, a[href*="utm_source=comix"]')].some(e => e.offsetParent !== null)), '', 'ad blocking');
 
+  section = 'Mobile layer';
+  check('Mobile optimizations active (`data-cx-mobile`)', await page.evaluate(() => document.documentElement.hasAttribute('data-cx-mobile')), '', 'mobile optimizations');
+  check('Site hover rules moved under (hover: hover)', await page.evaluate(() => { let bare = 0; const walk = (rules, inHover) => { for (const r of rules) { if (r.type === 1 && r.selectorText && r.selectorText.includes(':hover') && !inHover) bare++; else if (r.cssRules) walk(r.cssRules, inHover || /hover/.test(r.conditionText || '')); } }; for (const s of document.styleSheets) { try { walk(s.cssRules, false); } catch (e) {} } return bare === 0; }), '', 'no sticky hover after taps');
+  check('Footer `footer.footer` hidden', await page.evaluate(() => { const f = document.querySelector('footer.footer'); return !!f && f.offsetParent === null; }), '', 'footer hidden in the app');
+  check('Announcements `aside.announce` get a close button', await page.$('aside.announce .cx-close'), '', 'dismissible announcements');
+  check('Share bar `.share-block` gets a close button', await page.$('.share-block .cx-close'), '', 'dismissible share bar');
+  check('Carousel arrows `.section__controls .nav-btn` hidden', await page.evaluate(() => { const b = document.querySelector('.section__controls .nav-btn:not(.nav-btn--kebab)'); return !!b && b.offsetParent === null; }), '', 'cleaner home carousels');
+
   section = 'Dialogs';
   await page.evaluate(() => window.__comixium.openLogin()); await wait(800);
   check('Log in dialog opens (`.auth`)', await page.$('.auth'), '', 'native Log in button');
@@ -129,12 +137,17 @@ try {
       await page.evaluate(() => { const b = [...document.querySelectorAll('.rpage-floatctl button')].find(b => b.getAttribute('aria-label') === 'Help'); b && b.click(); });
       await wait(500);
       check('Help opens the app sheet, not the shortcut list', await page.evaluate(() => window.__msgs.some(m => m.t === 'readerHelp') && !/Keyboard shortcuts/i.test(document.body.innerText)), '', 'touch-controls sheet');
+      await page.click('.rpage-floatctl button[aria-label="Settings"]').catch(() => {}); await wait(700);
+      check('Reader settings open as a bottom sheet (`.minidlg`)', await page.evaluate(() => { const p = document.querySelector('.minidlg__panel'); return !!p && Math.abs(p.getBoundingClientRect().bottom - innerHeight) < 2; }), '', 'reader panels as bottom sheets');
+      await page.keyboard.press('Escape'); await wait(400);
       check('Pinch zoom enabled on chapters', await page.evaluate(() => /user-scalable=yes/.test(document.querySelector('meta[name=viewport]').content)), '', 'pinch zoom');
     }
   }
 
   // --- Other routes ---------------------------------------------------------------------------
   section = 'Routes';
+  await open('/genres');
+  check('Breadcrumbs `*__crumbs` hidden', await page.evaluate(() => { const c = document.querySelector('[class$="__crumbs"], [class*="__crumbs "]'); return !!c && c.offsetParent === null; }), '', 'breadcrumbs hidden in the app');
   await open('/browse?q=solo');
   check('`/browse?q=` searches', await page.evaluate(() => [...document.querySelectorAll('input')].some(i => /solo/i.test(i.value))), '', 'native search');
   await open('/user?tab=titles');

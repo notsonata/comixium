@@ -13,6 +13,24 @@ Smoother:
 - Removed always-running logo animations that cost scrolling smoothness
 - Lighter page monitoring while scrolling
 
+Mobile optimizations (on by default, More → Settings):
+
+- Library folders shown as chips instead of a cut-off scrolling row
+- All library sort options visible
+- Library and History skip the profile card
+- Profile stats fit the screen
+- Popular groups counts no longer cut off
+- Reader settings, chapter list and small dialogs open as bottom sheets
+- No stuck hover highlights after a tap
+- No scrollbars, site footer or breadcrumbs
+- Home carousels without arrow buttons (swipe instead)
+- Chip rows that scroll sideways fade at the edge to show there's more
+
+Home page:
+
+- Close button on announcements and the share bar
+- Toggles for both in More → Home page
+
 ## 1.2.0
 
 Navigation:

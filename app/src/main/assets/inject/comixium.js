@@ -105,22 +105,40 @@
   // The site's reader already toggles its controls on a double tap and turns pages on edge taps in
   // paged mode. On top of that: edge taps scroll a long strip, pinch zoom works on chapter pages,
   // and its keyboard-shortcut help is replaced by the app's touch-controls sheet.
-  var prefs = { tapEdges: true, pinchZoom: true, layout: 'rail', x: 'right', y: 'top', size: 'normal' };
+  var prefs = {
+    tapEdges: true, pinchZoom: true, layout: 'rail', x: 'right', y: 'top', size: 'normal',
+    mobile: true, announce: true, share: true
+  };
   var DEFAULTS = { layout: 'rail', x: 'right', y: 'top', size: 'normal' };
   var PREFS_KEY = 'comixium.reader';
   try { var saved = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); if (saved) setPrefsFrom(saved); } catch (e) { /* none */ }
 
   function setPrefsFrom(p) {
+    // Turning announcements back on also brings back the ones dismissed one by one.
+    if ((p.announce === true && prefs.announce === false) || p.clearDismissed) saveDismissed([]);
     for (var k in p) {
       if (!Object.prototype.hasOwnProperty.call(prefs, k)) continue;
       prefs[k] = typeof prefs[k] === 'boolean' ? !!p[k] : String(p[k]);
     }
   }
 
-  // Reader controls layout/position/size live on <html> as data-cx-* attributes (see comixium.css).
+  // Prefs live on <html> as data-cx-* attributes (see comixium.css): reader controls
+  // layout/position/size, the mobile optimizations switch, and which page this is.
+  function pageKey() {
+    var path = location.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/user') return 'user-' + (new URLSearchParams(location.search).get('tab') || 'titles');
+    if (path === '/' || path === '/home') return 'home';
+    return path.split('/')[1] || 'home';
+  }
+  function setAttr(root, name, value) {
+    if (value === null) { if (root.hasAttribute(name)) root.removeAttribute(name); }
+    else if (root.getAttribute(name) !== value) root.setAttribute(name, value);
+  }
   function applyControls() {
     var root = document.documentElement;
     if (!root) return;
+    setAttr(root, 'data-cx-mobile', prefs.mobile ? '' : null);
+    setAttr(root, 'data-cx-page', pageKey());
     [['layout', 'data-cx-layout'], ['x', 'data-cx-x'], ['y', 'data-cx-y'], ['size', 'data-cx-size']].forEach(function (a) {
       var v = prefs[a[0]];
       if (v === DEFAULTS[a[0]]) { if (root.hasAttribute(a[1])) root.removeAttribute(a[1]); }
@@ -201,6 +219,110 @@
     if (m.getAttribute('content') !== want) m.setAttribute('content', want);
   }
 
+  // --- Mobile optimizations (see the html[data-cx-mobile] rules in comixium.css) ---------------
+  // Hover styles stick after a tap on touch screens: move the site's :hover rules under
+  // @media (hover: hover) so they only apply with a real pointer. Runs once per stylesheet; turning
+  // the option off reloads the page, which restores the originals.
+  function fixHover() {
+    if (!prefs.mobile) return;
+    for (var i = 0; i < document.styleSheets.length; i++) {
+      var sheet = document.styleSheets[i];
+      if (sheet.__cxHover) continue;
+      var rules;
+      try { rules = sheet.cssRules; } catch (e) { continue; } // cross-origin (fonts)
+      if (!rules) continue;
+      sheet.__cxHover = true;
+      moveHoverRules(sheet, rules);
+    }
+  }
+  function moveHoverRules(parent, rules) {
+    for (var j = rules.length - 1; j >= 0; j--) {
+      var r = rules[j];
+      if (r.type === 1 && r.selectorText && r.selectorText.indexOf(':hover') >= 0) {
+        var text = r.cssText;
+        try {
+          parent.deleteRule(j);
+          parent.insertRule('@media (hover: hover) { ' + text + ' }', j);
+        } catch (e) { /* leave it */ }
+      } else if (r.type === 4 && r.cssRules && !/hover/.test(r.conditionText || '')) {
+        moveHoverRules(r, r.cssRules);
+      }
+    }
+  }
+
+  // Sideways-scrolling chip rows: mark which edge has more, for the fade in comixium.css.
+  function markScrollers() {
+    if (!prefs.mobile) return;
+    var els = document.querySelectorAll('.useg--scroll, .utabs');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (!el.__cxScroll) {
+        el.__cxScroll = true;
+        el.addEventListener('scroll', function () { markScroller(this); }, { passive: true });
+      }
+      markScroller(el);
+    }
+  }
+  function markScroller(el) {
+    var more = el.scrollWidth - el.clientWidth > 2;
+    var start = more && el.scrollLeft > 2;
+    var end = more && el.scrollLeft < el.scrollWidth - el.clientWidth - 2;
+    setAttr(el, 'data-cx-more', start && end ? 'both' : start ? 'start' : end ? 'end' : null);
+  }
+
+  // --- Home page: dismissible announcement and share bar -------------------------------------
+  var DISMISSED_KEY = 'comixium.dismissed';
+  function loadDismissed() {
+    try { return JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveDismissed(list) {
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify(list.slice(-50))); } catch (e) { /* private mode */ }
+  }
+  function textKey(t) {
+    var h = 5381;
+    for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0;
+    return 'a' + (h >>> 0).toString(36);
+  }
+  function addClose(el, label, onClose) {
+    el.classList.add('cx-dismissible');
+    if (el.querySelector(':scope > .cx-close')) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cx-close';
+    b.setAttribute('aria-label', label);
+    b.textContent = '\u00d7';
+    b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); onClose(); });
+    el.appendChild(b);
+  }
+  function homeBlocks() {
+    if (pageKey() !== 'home') return;
+    var dismissed = loadDismissed();
+    var notes = document.querySelectorAll('aside.announce');
+    for (var i = 0; i < notes.length; i++) {
+      (function (a) {
+        // textContent, not innerText: innerText changes once the element is hidden.
+        var key = textKey((a.textContent || '').replace(/\u00d7/g, '').replace(/\s+/g, ' ').trim());
+        a.classList.toggle('cx-hidden', !prefs.announce || dismissed.indexOf(key) >= 0);
+        addClose(a, 'Dismiss announcement', function () {
+          var list = loadDismissed();
+          list.push(key);
+          saveDismissed(list);
+          a.classList.add('cx-hidden');
+        });
+      })(notes[i]);
+    }
+    var shares = document.querySelectorAll('.share-block');
+    for (var j = 0; j < shares.length; j++) {
+      shares[j].classList.toggle('cx-hidden', !prefs.share);
+      addClose(shares[j], 'Hide share bar', function () {
+        prefs.share = false;
+        try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* private mode */ }
+        homeBlocks();
+        post({ t: 'pref', key: 'share', value: false });
+      });
+    }
+  }
+
   // --- State reporting ----------------------------------------------------------------------
   var VARS = {
     bg: '--bg', bg2: '--bg-2', surface: '--surface', surface2: '--surface-2', surface3: '--surface-3',
@@ -245,6 +367,10 @@
   function report() {
     if (!document.documentElement) return;
     applyZoom();
+    applyControls();
+    fixHover();
+    markScrollers();
+    homeBlocks();
     var s = snapshot();
     var key = JSON.stringify(s);
     if (key !== last) { last = key; post(s); }
@@ -354,6 +480,9 @@
       try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* private mode */ }
       applyZoom();
       applyControls();
+      fixHover();
+      markScrollers();
+      homeBlocks();
       return true;
     },
     scrollByPage: function (dir) {

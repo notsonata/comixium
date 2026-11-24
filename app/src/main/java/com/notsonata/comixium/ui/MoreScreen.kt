@@ -37,6 +37,7 @@ import com.notsonata.comixium.ui.icons.Lucide
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.ui.theme.Poppins
 import com.notsonata.comixium.web.AuthState
+import com.notsonata.comixium.web.AppPrefs
 import com.notsonata.comixium.web.ReaderPrefs
 import com.notsonata.comixium.web.Site
 
@@ -66,6 +67,9 @@ fun MoreScreen(
     onAdBlock: (Boolean) -> Unit,
     onDomain: (String) -> Unit,
     reader: ReaderPrefs,
+    app: AppPrefs,
+    onPagePrefsChanged: () -> Unit,
+    onMobileOptimizations: (Boolean) -> Unit,
     onClearCache: () -> Unit,
 ) {
     val c = LocalComixColors.current
@@ -116,9 +120,25 @@ fun MoreScreen(
             )
         }
         Section("READER CONTROLS") {
-            ReaderControlsSettings(reader, onChanged = {})
+            ReaderControlsSettings(reader, onChanged = onPagePrefsChanged)
+        }
+        Section("HOME PAGE") {
+            ToggleRow(
+                Lucide.Bell, "Announcements",
+                subtitle = if (app.homeAnnouncements) "Tap ✕ on one to dismiss it" else "Hidden. Turning on brings back dismissed ones",
+                checked = app.homeAnnouncements, onChange = { app.updateHomeAnnouncements(it); onPagePrefsChanged() },
+            )
+            ToggleRow(
+                Lucide.Share, "Share bar", subtitle = "The row of share buttons on the home page",
+                checked = app.homeShareBar, onChange = { app.updateHomeShareBar(it); onPagePrefsChanged() },
+            )
         }
         Section("SETTINGS") {
+            ToggleRow(
+                Lucide.Hand, "Mobile optimizations",
+                subtitle = if (app.mobileOptimizations) "Touch-friendly fixes to the site's layout" else "Off: the site's own mobile layout",
+                checked = app.mobileOptimizations, onChange = onMobileOptimizations,
+            )
             Row(Lucide.Palette, "Theme & content filter", subtitle = "The site's own settings", onClick = onSiteSettings)
             ToggleRow(
                 Lucide.Shield, "Block ads",

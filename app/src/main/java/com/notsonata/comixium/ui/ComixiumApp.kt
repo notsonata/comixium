@@ -248,6 +248,9 @@ private fun AppContent(engine: WebEngine) {
                     onAdBlock = engine::updateAdBlock,
                     onDomain = engine::switchDomain,
                     reader = engine.reader,
+                    app = engine.appPrefs,
+                    onPagePrefsChanged = engine::pushPagePrefs,
+                    onMobileOptimizations = engine::setMobileOptimizations,
                     onClearCache = {
                         engine.clearCache()
                         Toast.makeText(context, "Cache cleared", Toast.LENGTH_SHORT).show()
@@ -268,7 +271,7 @@ private fun AppContent(engine: WebEngine) {
     if (engine.readerHelpOpen) {
         ReaderHelpSheet(
             reader = engine.reader,
-            onChanged = engine::pushReaderPrefs,
+            onChanged = engine::pushPagePrefs,
             onDismiss = { engine.readerHelpOpen = false },
         )
     }

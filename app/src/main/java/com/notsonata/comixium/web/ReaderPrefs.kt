@@ -40,10 +40,10 @@ class ReaderPrefs(private val prefs: SharedPreferences) {
     fun updateTapEdges(on: Boolean) { tapEdges = on; prefs.edit { putBoolean(KEY_TAP_EDGES, on) } }
     fun updatePinchZoom(on: Boolean) { pinchZoom = on; prefs.edit { putBoolean(KEY_PINCH_ZOOM, on) } }
 
-    /** The options the page script applies itself (see setPrefs in comixium.js). */
-    fun pageScriptCall(): String =
-        "window.__comixium && window.__comixium.setPrefs({tapEdges:$tapEdges,pinchZoom:$pinchZoom," +
-            "layout:'$controlsLayout',x:'$controlsX',y:'$controlsY',size:'$controlsSize'})"
+    /** The reader options the page script applies itself (see setPrefs in comixium.js). */
+    fun pageScriptFields(): String =
+        "tapEdges:$tapEdges,pinchZoom:$pinchZoom," +
+            "layout:'$controlsLayout',x:'$controlsX',y:'$controlsY',size:'$controlsSize'"
 
     private companion object {
         const val KEY_IMMERSIVE = "reader_immersive"

@@ -43,6 +43,11 @@ class WebEngine(private val app: Application) {
 
     val recentSearches = RecentSearches(prefs)
     val reader = ReaderPrefs(prefs)
+    val appPrefs = AppPrefs(prefs)
+
+    /** All options the page script applies, as one setPrefs call. */
+    fun pagePrefsCall(): String =
+        "window.__comixium && window.__comixium.setPrefs({${reader.pageScriptFields()},${appPrefs.pageScriptFields()}})"
 
     /** The tab currently on screen (null on native-only screens); used for hardware keys. */
     var activeTab: WebTab? = null
@@ -53,9 +58,25 @@ class WebEngine(private val app: Application) {
     /** The reader's help button was tapped: show the touch-controls sheet. */
     var readerHelpOpen by mutableStateOf(false)
 
-    /** Re-sends reader options to the page on screen after they change. */
-    fun pushReaderPrefs() {
-        activeTab?.takeIf { it.isReader }?.js(reader.pageScriptCall())
+    /** Re-sends page options to every open page after they change. */
+    fun pushPagePrefs() {
+        val call = pagePrefsCall()
+        tabs.values.filter { it.isCreated }.forEach { it.js(call) }
+    }
+
+    /** Mobile optimizations rewrite some of the site's styles, so turning them off needs a reload. */
+    fun setMobileOptimizations(on: Boolean) {
+        appPrefs.updateMobileOptimizations(on)
+        pushPagePrefs()
+        tabs.values.filter { it.isCreated }.forEach { it.reload() }
+    }
+
+    /** A setting changed from inside a page (e.g. the ✕ on the home share bar). */
+    internal fun onPagePref(key: String, value: Boolean) {
+        when (key) {
+            "share" -> appPrefs.updateHomeShareBar(value)
+            "announce" -> appPrefs.updateHomeAnnouncements(value)
+        }
     }
 
     /** A comix.ws / comix.to link opened from another app, waiting for the UI to show it. */

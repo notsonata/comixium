@@ -126,3 +126,200 @@ html[data-cx-size="large"] .rpage-floatctl__chap { font-size: var(--text-base) !
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* --- Home page blocks the user dismissed (announcement or share bar) ---------------------- */
+.cx-hidden {
+  display: none !important;
+}
+.cx-dismissible {
+  position: relative;
+}
+.cx-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-3);
+  font: 400 20px/1 system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cx-close:active {
+  background: var(--surface-2);
+}
+.share-block.cx-dismissible {
+  padding-right: 36px;
+}
+
+/* ===========================================================================================
+   Mobile optimizations. Everything below only applies with html[data-cx-mobile] (a toggle in
+   the app, on by default); without it the site keeps its own mobile layout.
+   =========================================================================================== */
+
+/* Touch screens show their own scroll indicators; the site's always-on 10px bars look broken. */
+html[data-cx-mobile] ::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+html[data-cx-mobile] * {
+  scrollbar-width: none !important;
+}
+
+/* The app's top bar and bottom tabs replace the footer links and breadcrumbs. */
+html[data-cx-mobile] footer.footer,
+html[data-cx-mobile] [class$="__crumbs"],
+html[data-cx-mobile] [class*="__crumbs "] {
+  display: none !important;
+}
+
+/* No text-selection handles when long-pressing buttons, links, chips or cards. */
+html[data-cx-mobile] a,
+html[data-cx-mobile] button,
+html[data-cx-mobile] label,
+html[data-cx-mobile] img,
+html[data-cx-mobile] [role="button"],
+html[data-cx-mobile] .useg,
+html[data-cx-mobile] .card {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Home carousels are swiped; their small arrow buttons are desktop controls. */
+html[data-cx-mobile] .section__controls .nav-btn:not(.nav-btn--kebab) {
+  display: none !important;
+}
+html[data-cx-mobile] .nav-btn--kebab {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+/* Sideways-scrolling chip rows fade at the edge that has more (data-cx-more set by the script). */
+html[data-cx-mobile] [data-cx-more="end"] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+}
+html[data-cx-mobile] [data-cx-more="start"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px);
+  mask-image: linear-gradient(90deg, transparent, #000 32px);
+}
+html[data-cx-mobile] [data-cx-more="both"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+
+/* Library: show every folder as wrapping chips instead of a row that runs off screen. */
+html[data-cx-mobile] .uview__folders .useg--scroll {
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+  max-width: none;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+}
+html[data-cx-mobile] .uview__folders .useg__btn {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+html[data-cx-mobile] .uview__folders .useg__btn.is-on {
+  background: var(--surface-3);
+  color: var(--text-emphasis, var(--text));
+}
+
+/* Library: all three sort options fit beside the grid/list switch. */
+html[data-cx-mobile] .uview__sort-tabs {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+html[data-cx-mobile] .uview__sort-tabs > .useg--scroll {
+  display: flex !important;
+  overflow: visible !important;
+  max-width: none;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+html[data-cx-mobile] .uview__sort-tabs > .useg--scroll .useg__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.2;
+  min-height: 40px;
+  padding: 4px 6px;
+  font-size: var(--text-sm);
+}
+
+/* Library and History are app tabs already: skip the profile card and section switcher there. */
+html[data-cx-mobile][data-cx-page="user-titles"] .uprofile,
+html[data-cx-mobile][data-cx-page="user-history"] .uprofile,
+html[data-cx-mobile][data-cx-page="user-titles"] .umenu,
+html[data-cx-mobile][data-cx-page="user-history"] .umenu {
+  display: none !important;
+}
+
+/* Profile stats fit the width instead of cutting off ("COLLEC…"). */
+html[data-cx-mobile] .uprofile__stats {
+  display: grid !important;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  overflow: visible;
+}
+html[data-cx-mobile] .uprofile__stat {
+  min-width: 0;
+}
+html[data-cx-mobile] .uprofile__stat-label {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Popular groups: name, bar and count fit the screen (counts were cut off). */
+html[data-cx-mobile] .ggrid > li {
+  width: auto !important;
+}
+html[data-cx-mobile] .gitem {
+  grid-template-columns: minmax(0, 1fr) minmax(40px, 28%) auto !important;
+  gap: 10px !important;
+}
+
+/* Reader settings, chapter list and other small dialogs open as bottom sheets. */
+html[data-cx-mobile] .minidlg {
+  align-items: flex-end !important;
+  padding: 0 !important;
+}
+html[data-cx-mobile] .minidlg__panel {
+  max-width: none !important;
+  width: 100% !important;
+  border-radius: 16px 16px 0 0 !important;
+  max-height: 88dvh;
+  animation: cx-sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+}
+html[data-cx-mobile] .minidlg__panel::before {
+  content: "";
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 4px;
+  border-radius: 2px;
+  background: rgb(var(--text-rgb) / 0.25);
+}
+@keyframes cx-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
