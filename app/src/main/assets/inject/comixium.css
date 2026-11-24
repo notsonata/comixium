@@ -1,0 +1,35 @@
+/* Comixium app stylesheet, injected into comix.ws / comix.to pages. */
+
+/* --- Ads ---------------------------------------------------------------------------------- */
+/* Popunder: an empty full-screen link the site appends to <body> (also removed by script). */
+body > a[target="_blank"]:empty,
+a[style*="z-index: 9999999"],
+a[style*="z-index:9999999"] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* First-party promo banners (home page, end of chapter) and any utm-tagged partner link. */
+.home-banner,
+.rpage-chap-ending__banner,
+a[href*="gotaku."],
+a[href*="utm_source=comix"] {
+  display: none !important;
+}
+
+/* --- Things that make no sense inside the app --------------------------------------------- */
+/* "Install PWA" banner (the Discord one stays). */
+.pwa-banner:not(.pwa-banner--discord) {
+  display: none !important;
+}
+
+/* Google refuses sign-in inside embedded web views, so only offer email/password. */
+.auth__or,
+.auth__socials {
+  display: none !important;
+}
+
+/* No blue tap flash; the site already styles :active states. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
