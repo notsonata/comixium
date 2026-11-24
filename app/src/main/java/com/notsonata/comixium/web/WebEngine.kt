@@ -50,6 +50,14 @@ class WebEngine(private val app: Application) {
     /** Set by the activity while it's alive. */
     var services: ActivityServices? = null
 
+    /** The reader's help button was tapped: show the touch-controls sheet. */
+    var readerHelpOpen by mutableStateOf(false)
+
+    /** Re-sends reader options to the page on screen after they change. */
+    fun pushReaderPrefs() {
+        activeTab?.takeIf { it.isReader }?.js(reader.pageScriptCall())
+    }
+
     /** A comix.ws / comix.to link opened from another app, waiting for the UI to show it. */
     var deepLinkPath by mutableStateOf<String?>(null)
 

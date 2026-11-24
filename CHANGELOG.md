@@ -4,6 +4,11 @@ Each section becomes the notes of the GitHub release for that version.
 
 ## 1.1.0
 
+- **Touch controls in the reader**: the help button in the reader now opens my own "Touch controls" sheet instead of a list of keyboard shortcuts nobody can use on a phone. It lists every gesture and has the reader options right there.
+  - Double tap the middle of the page to show or hide the reader controls.
+  - In long-strip mode, tapping the left or right edge now scrolls up or down a screen (paged mode already turned pages that way). Quick repeated edge taps keep scrolling instead of being read as a double tap.
+  - Pinch to zoom now works on chapter pages; the rest of the site stays locked like before.
+  - Both new behaviours can be switched off in the sheet or in More → Reader.
 - **New look**: I made the app's logo out of the comix.ws one. The wordmark now reads COMIXIUM (same letterforms, with a U drawn to match their O), and it follows my site theme colours like the original does. The launcher icon and splash screen use the frame-and-X emblem with a soft glow behind the X, and there's a matching themed icon for Android 13+.
 
 ## 1.0.0
