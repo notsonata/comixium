@@ -27,4 +27,11 @@ class PageStateTest {
         assertNull(PageState.parse("""{"t":"other"}"""))
         assertNull(PageState.parse("not json"))
     }
+
+    @Test fun parsesDownload() {
+        val d = PageDownload.parse("""{"t":"download","name":"comix-backup.json","mime":"application/json","data":"eyJsaWJyYXJ5IjpbMSwyLDNdfQ=="}""")!!
+        assertEquals("comix-backup.json", d.name)
+        assertEquals("{\"library\":[1,2,3]}", String(d.bytes))
+        assertNull(PageDownload.parse("""{"t":"state"}"""))
+    }
 }

@@ -59,6 +59,48 @@
       zap(a);
     }
   }, true);
+  // --- In-memory downloads ------------------------------------------------------------------
+  // Pages build some files in memory (e.g. a library backup) and "download" them through a
+  // blob: or data: link, which the app can't fetch. Keep the blobs behind object URLs so they
+  // can be handed over even if the page revokes the URL right after clicking.
+  var blobs = {};
+  var origCreate = URL.createObjectURL;
+  URL.createObjectURL = function (obj) {
+    var u = origCreate.apply(URL, arguments);
+    try { if (obj instanceof Blob && !/^image\//.test(obj.type)) blobs[u] = obj; } catch (e) { /* ignore */ }
+    return u;
+  };
+  var origRevoke = URL.revokeObjectURL;
+  URL.revokeObjectURL = function (u) {
+    setTimeout(function () { delete blobs[u]; }, 60000);
+    return origRevoke.apply(URL, arguments);
+  };
+  function sendBlob(blob, name) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var s = String(fr.result);
+      post({ t: 'download', name: name, mime: blob.type || 'application/octet-stream', data: s.slice(s.indexOf(',') + 1) });
+    };
+    fr.readAsDataURL(blob);
+  }
+  function handleDownload(a) {
+    var href = a.href || '';
+    if (!a.hasAttribute('download') || !/^(blob|data):/i.test(href)) return false;
+    var name = a.getAttribute('download') || 'download';
+    if (blobs[href]) sendBlob(blobs[href], name);
+    else fetch(href).then(function (r) { return r.blob(); }).then(function (b) { sendBlob(b, name); });
+    return true;
+  }
+  var origAnchorClick = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () {
+    if (handleDownload(this)) return;
+    return origAnchorClick.apply(this, arguments);
+  };
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[download]') : null;
+    if (a && handleDownload(a)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+
   // --- State reporting ----------------------------------------------------------------------
   var VARS = {
     bg: '--bg', bg2: '--bg-2', surface: '--surface', surface2: '--surface-2', surface3: '--surface-3',

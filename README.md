@@ -17,6 +17,8 @@ and built-in ad blocking.
 | More | Account pages, the site's Browse menu shortcuts, the site's theme/content settings, ad blocking toggle, domain switch, cache. |
 | Library / History | Show a native log-in prompt when you're logged out (the site redirects those pages). |
 | Reader | Chapter pages go full screen (bars hidden, swipe to peek), keep the screen on, and volume keys step through the chapter using the site reader's own shortcuts, so its scroll distance and reading direction apply. Each is a toggle in More. |
+| Sharing & files | Share button on series pages; long-press any image to save (Pictures/Comixium), share or copy its link; file pickers and downloads (including the site's in-memory backup export) work. |
+| Links | comix.ws / comix.to links from other apps can open in Comixium (pick it in the "Open with" chooser). |
 | Theme | Native colours follow whatever theme you pick in the site's settings (Main, Dark, Light, Custom). |
 
 Screenshots of the native parts (rendered on the JVM by Roborazzi) live in `app/screenshots/`;

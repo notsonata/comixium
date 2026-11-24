@@ -22,7 +22,7 @@ class WebEngine(private val app: Application) {
 
     private val prefs = app.getSharedPreferences("comixium", Context.MODE_PRIVATE)
 
-    val adBlocker = AdBlocker { runCatching { app.assets.open("adblock/hosts.gz") }.getOrNull() }.apply {
+    val adBlocker = AdBlocker { runCatching { app.assets.open(HOSTS_ASSET) }.getOrNull() }.apply {
         enabled = prefs.getBoolean(KEY_ADBLOCK, true)
         loadAsync()
     }
@@ -46,6 +46,12 @@ class WebEngine(private val app: Application) {
 
     /** The tab currently on screen (null on native-only screens); used for hardware keys. */
     var activeTab: WebTab? = null
+
+    /** Set by the activity while it's alive. */
+    var services: ActivityServices? = null
+
+    /** A comix.ws / comix.to link opened from another app, waiting for the UI to show it. */
+    var deepLinkPath by mutableStateOf<String?>(null)
 
     private val tabs = linkedMapOf<String, WebTab>()
 
@@ -144,6 +150,7 @@ class WebEngine(private val app: Application) {
     }
 
     companion object {
+        const val HOSTS_ASSET = "adblock/hosts.txt"
         private const val KEY_DOMAIN = "domain"
         private const val KEY_THEME = "theme_vars"
         private const val KEY_THEME_LIGHT = "theme_light"

@@ -122,6 +122,11 @@ class WebTab(
         webView.loadUrl(url)
     }
 
+    /** Navigate to [path] on top of the current history (deep links), now or once shown. */
+    fun push(path: String) {
+        if (!created) pendingPath = path else loadPath(path)
+    }
+
     /** Bottom-bar reselect: scroll to top if already on the tab's start page, else go there fresh. */
     fun goRoot() {
         val root = startPath ?: return
@@ -205,6 +210,23 @@ class WebTab(
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(wv.settings, false)
         }
+        wv.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            // blob:/data: downloads are handled in the page script (they can't be fetched from here).
+            if (Site.schemeOf(url) == "http" || Site.schemeOf(url) == "https") {
+                contextWrapper.baseContext?.let { Downloads.enqueue(it, url, userAgent, contentDisposition, mimetype) }
+            }
+        }
+        wv.setOnLongClickListener {
+            val hit = wv.hitTestResult
+            val src = hit.extra
+            val isImage = hit.type == WebView.HitTestResult.IMAGE_TYPE || hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
+            if (isImage && src != null && (Site.schemeOf(src) == "https" || Site.schemeOf(src) == "http")) {
+                engine.services?.onImageLongPress(src, displayTitle.ifBlank { "comixium" })
+                true
+            } else {
+                false
+            }
+        }
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(wv, true)
@@ -228,6 +250,10 @@ class WebTab(
     }
 
     private fun onMessage(json: String) {
+        PageDownload.parse(json)?.let { d ->
+            contextWrapper.baseContext?.let { Downloads.saveBytes(it, d.name, d.mime, d.bytes) }
+            return
+        }
         val state = PageState.parse(json) ?: return
         if (state.title.isNotBlank()) title = state.title
         isReader = state.isReader || Site.isReaderUrl(state.url)
@@ -371,6 +397,12 @@ class WebTab(
         override fun onProgressChanged(view: WebView, newProgress: Int) {
             progress = newProgress
         }
+
+        override fun onShowFileChooser(
+            view: WebView,
+            callback: android.webkit.ValueCallback<Array<Uri>>,
+            params: FileChooserParams,
+        ): Boolean = engine.services?.chooseFiles(callback, params) ?: false
 
         override fun onReceivedTitle(view: WebView, t: String?) {
             if (!t.isNullOrBlank() && !t.startsWith("http")) title = t

@@ -28,6 +28,11 @@ object Site {
 
     fun isReaderUrl(url: String?): Boolean = isSiteUrl(url) && isReaderPath(pathOnly(url))
 
+    private val TITLE_PATH = Regex("^/title/[^/]+/?$")
+
+    /** A series page (not a chapter). */
+    fun isTitleUrl(url: String?): Boolean = isSiteUrl(url) && TITLE_PATH.matches(pathOnly(url))
+
     fun url(domain: String, path: String): String = "https://$domain" + (if (path.startsWith("/")) path else "/$path")
 
     /** Same path on another domain (for falling back from comix.ws to comix.to and back). */

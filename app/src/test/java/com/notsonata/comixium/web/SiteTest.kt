@@ -35,4 +35,11 @@ class SiteTest {
         assertEquals("https://comix.to/title/a?b=1", Site.swapDomain("https://comix.ws/title/a?b=1", "comix.to"))
         assertEquals("https://comix.ws/user?tab=history", Site.url("comix.ws", "user?tab=history"))
     }
+
+    @Test fun titleUrls() {
+        assertTrue(Site.isTitleUrl("https://comix.ws/title/9nej6-return-of-the-blossoming-blade"))
+        assertTrue(Site.isTitleUrl("https://comix.to/title/abc-x/?tab=chapters"))
+        assertFalse(Site.isTitleUrl("https://comix.ws/title/abc-x/123-chapter-1"))
+        assertFalse(Site.isTitleUrl("https://comix.ws/browse"))
+    }
 }

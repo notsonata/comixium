@@ -1,7 +1,19 @@
 package com.notsonata.comixium
 
 import android.graphics.Color
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.notsonata.comixium.ui.ImageSheet
+import com.notsonata.comixium.web.ActivityServices
+import com.notsonata.comixium.web.Site
 import android.view.KeyEvent
 import android.webkit.CookieManager
 import androidx.activity.ComponentActivity
@@ -13,14 +25,49 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.notsonata.comixium.ui.ComixiumApp
 import com.notsonata.comixium.ui.theme.ComixiumTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), ActivityServices {
 
     private val engine get() = (application as ComixiumApplication).engine
+
+    private var imageMenu by mutableStateOf<Pair<String, String>?>(null)
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private val fileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res.resultCode, res.data))
+        fileCallback = null
+    }
+
+    override fun chooseFiles(callback: ValueCallback<Array<Uri>>, params: WebChromeClient.FileChooserParams): Boolean {
+        fileCallback?.onReceiveValue(null)
+        fileCallback = callback
+        return try {
+            fileLauncher.launch(params.createIntent())
+            true
+        } catch (_: ActivityNotFoundException) {
+            fileCallback = null
+            false
+        }
+    }
+
+    override fun onImageLongPress(imageUrl: String, pageTitle: String) {
+        imageMenu = imageUrl to pageTitle
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val url = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString ?: return
+        if (Site.isSiteUrl(url)) engine.deepLinkPath = Site.pathOf(url)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        engine.services = this
+        if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val colors = engine.colors
             LaunchedEffect(colors.isLight) {
@@ -33,6 +80,9 @@ class MainActivity : ComponentActivity() {
             }
             ComixiumTheme(colors) {
                 ComixiumApp(engine)
+                imageMenu?.let { (url, title) ->
+                    ImageSheet(url, title, userAgent = engine.activeTab?.webView?.settings?.userAgentString) { imageMenu = null }
+                }
             }
         }
     }
@@ -67,6 +117,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (engine.services === this) engine.services = null
+        fileCallback?.onReceiveValue(null)
+        fileCallback = null
         engine.createdTabs.forEach { it.detach(applicationContext) }
         super.onDestroy()
     }
