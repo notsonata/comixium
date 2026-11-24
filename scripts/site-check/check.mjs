@@ -1,7 +1,9 @@
 // Daily check that comix still has everything Comixium hooks into.
 // Loads the live site in Chromium at phone size with the app's injected page script (the same
 // script and stylesheet the app ships) and checks each dependency. Prints a Markdown report;
-// exits 1 if any check fails, 2 if the site couldn't be reached at all (e.g. a Cloudflare wall).
+// exits 1 if any check fails on a page that loaded, 2 if the site couldn't be reached at all.
+// GitHub's runners sometimes get Cloudflare's "checking your browser" page: the script waits for it
+// to clear and retries; checks on pages that stay behind it are reported as skipped, not failed.
 //
 // usage: node scripts/site-check/check.mjs [--base https://comix.ws]
 import { chromium } from 'playwright';
@@ -17,7 +19,9 @@ const pageScript = readFileSync(join(inject, 'comixium.js'), 'utf8')
 
 const results = [];
 let section = '';
-const check = (name, ok, detail = '', affects = '') => results.push({ section, name, ok: !!ok, detail, affects });
+let blockedSection = false;
+const check = (name, ok, detail = '', affects = '') =>
+  results.push({ section, name, ok: !!ok, skipped: blockedSection, detail, affects });
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 const browser = await chromium.launch();
@@ -31,21 +35,34 @@ const errors = [];
 page.on('pageerror', e => { if (/comixium/i.test(e.stack || '')) errors.push(e.message); });
 const lastState = () => page.evaluate(() => [...window.__msgs].reverse().find(m => m.t === 'state') || null);
 
+const challenged = () => page.evaluate(() =>
+  /__cf_chl/.test(location.href) ||
+  /just a moment|attention required|verify(ing)? you are human|checking your browser/i
+    .test(document.title + ' ' + ((document.body && document.body.innerText) || '').slice(0, 400)) ||
+  !!document.querySelector('#challenge-form, #challenge-running, iframe[src*="challenges.cloudflare.com"]:not(.auth iframe)'),
+).catch(() => true);
+
+/** Loads a page, waiting out Cloudflare challenges. Returns true if the real page loaded. */
 async function open(path) {
-  const res = await page.goto(BASE + path, { waitUntil: 'networkidle', timeout: 60000 }).catch(e => ({ error: e }));
-  await wait(1500);
-  const blocked = await page.evaluate(() => /Just a moment|cf-browser-verification|challenge-platform\/h\//.test(document.title + document.body.innerText.slice(0, 500))).catch(() => true);
-  return { res, blocked };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
+    for (let i = 0; i < 25 && await challenged(); i++) await wait(1000); // challenges usually clear in a few seconds
+    if (!(await challenged())) {
+      await page.waitForLoadState('networkidle').catch(() => {});
+      await wait(1500);
+      blockedSection = false;
+      return true;
+    }
+    await wait(10000);
+  }
+  blockedSection = true; // checks in this section are reported as skipped
+  return false;
 }
 
 try {
   // --- Home -----------------------------------------------------------------------------------
   section = 'Home';
-  const home = await open('/');
-  if (home.res?.error || home.blocked) {
-    console.log(`# Site check: could not load ${BASE}\n\n${home.blocked ? 'Blocked by a Cloudflare challenge.' : String(home.res.error)}`);
-    process.exit(2);
-  }
+  await open('/');
   check('App page script runs', await page.evaluate(() => !!window.__comixium), errors.join('; '), 'everything below');
   const diag = await page.evaluate(() => JSON.stringify({
     url: location.href, title: document.title,
@@ -120,7 +137,7 @@ try {
   section = 'Routes';
   await open('/browse?q=solo');
   check('`/browse?q=` searches', await page.evaluate(() => [...document.querySelectorAll('input')].some(i => /solo/i.test(i.value))), '', 'native search');
-  const lib = await page.goto(BASE + '/user?tab=titles', { waitUntil: 'domcontentloaded' });
+  await open('/user?tab=titles');
   check('Logged out `/user` redirects home', /\/home\/?$|\/$/.test(new URL(page.url()).pathname), page.url(), 'Library/History log-in prompt');
 } catch (e) {
   check('Check script ran to the end', false, String(e && e.stack || e));
@@ -128,19 +145,25 @@ try {
   await browser.close();
 }
 
-const failed = results.filter(r => !r.ok);
-const lines = [`# Site check: ${failed.length ? `${failed.length} problem${failed.length > 1 ? 's' : ''}` : 'all good'}`, '', `Checked ${BASE} on ${new Date().toISOString().slice(0, 10)}.`, ''];
+const failed = results.filter(r => !r.ok && !r.skipped);
+const skipped = results.filter(r => r.skipped);
+const reachable = results.some(r => !r.skipped);
+const status = failed.length ? `${failed.length} problem${failed.length > 1 ? 's' : ''}`
+  : !reachable ? 'site unreachable (Cloudflare challenge)'
+  : skipped.length ? `no problems (${skipped.length} checks skipped behind a Cloudflare challenge)` : 'all good';
+const lines = [`# Site check: ${status}`, '', `Checked ${BASE} on ${new Date().toISOString().slice(0, 10)}.`, ''];
 if (failed.length) {
   lines.push('## Broken', '', '| Area | Check | Affects | Detail |', '| --- | --- | --- | --- |');
   failed.forEach(r => lines.push(`| ${r.section} | ${r.name} | ${r.affects} | ${String(r.detail).replace(/\|/g, '\\|').slice(0, 200)} |`));
   lines.push('');
 }
 lines.push('## All checks', '');
-results.forEach(r => lines.push(`- ${r.ok ? '✅' : '❌'} ${r.section}: ${r.name}`));
+results.forEach(r => lines.push(`- ${r.skipped ? '⏭️' : r.ok ? '✅' : '❌'} ${r.section}: ${r.name}${r.skipped ? ' (skipped: Cloudflare challenge)' : ''}`));
 console.log(lines.join('\n'));
 // On GitHub Actions, also surface each failure as an annotation on the run / pull request.
 if (process.env.GITHUB_ACTIONS) {
   const esc = t => String(t).replace(/%/g, '%25').replace(/\r/g, '').replace(/\n/g, ' ');
   failed.forEach(r => console.error(`::error title=Site check: ${esc(r.section)}::${esc(r.name)}. Affects: ${esc(r.affects)}. ${esc(r.detail).slice(0, 300)}`));
+  if (skipped.length) console.error(`::warning title=Site check::${skipped.length} checks skipped behind a Cloudflare challenge: ${esc([...new Set(skipped.map(r => r.section))].join(', '))}`);
 }
-process.exit(failed.length ? 1 : 0);
+process.exit(failed.length ? 1 : reachable ? 0 : 2);
