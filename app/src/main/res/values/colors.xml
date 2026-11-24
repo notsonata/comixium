@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- comix.ws default ("main") theme tokens -->
+    <color name="comix_bg">#FF22282A</color>
+    <color name="comix_surface">#FF2A3134</color>
+    <color name="comix_accent">#FF66E8FA</color>
+</resources>
