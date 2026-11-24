@@ -37,6 +37,7 @@ import com.notsonata.comixium.ui.icons.Lucide
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.ui.theme.Poppins
 import com.notsonata.comixium.web.AuthState
+import com.notsonata.comixium.web.ReaderPrefs
 import com.notsonata.comixium.web.Site
 
 /** Shortcuts from the site's header "Browse" menu, in the same order. */
@@ -64,6 +65,7 @@ fun MoreScreen(
     onSiteSettings: () -> Unit,
     onAdBlock: (Boolean) -> Unit,
     onDomain: (String) -> Unit,
+    reader: ReaderPrefs,
     onClearCache: () -> Unit,
 ) {
     val c = LocalComixColors.current
@@ -85,6 +87,23 @@ fun MoreScreen(
         }
         Section("BROWSE") {
             BROWSE_SHORTCUTS.forEach { (label, icon, path) -> Row(icon, label) { onOpen(path) } }
+        }
+        Section("READER") {
+            ToggleRow(
+                Lucide.Expand, "Full screen",
+                subtitle = "Hide the status and navigation bars while reading",
+                checked = reader.immersive, onChange = reader::updateImmersive,
+            )
+            ToggleRow(
+                Lucide.Volume, "Volume keys turn pages",
+                subtitle = "Down = next, up = previous; uses your reader scroll distance",
+                checked = reader.volumeKeys, onChange = reader::updateVolumeKeys,
+            )
+            ToggleRow(
+                Lucide.Sun, "Keep screen on",
+                subtitle = "While a chapter is open",
+                checked = reader.keepScreenOn, onChange = reader::updateKeepScreenOn,
+            )
         }
         Section("SETTINGS") {
             Row(Lucide.Palette, "Theme & content filter", subtitle = "The site's own settings", onClick = onSiteSettings)

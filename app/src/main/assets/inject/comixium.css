@@ -52,6 +52,11 @@ a[href*="utm_source=comix"] {
   display: none !important;
 }
 
+/* The app already shows the reader full screen; the site's fullscreen API button would fight it. */
+.rpage-floatctl__btn--fs {
+  display: none !important;
+}
+
 /* No blue tap flash; the site already styles :active states. */
 * {
   -webkit-tap-highlight-color: transparent;
