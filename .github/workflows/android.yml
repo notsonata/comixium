@@ -55,11 +55,22 @@ jobs:
         run: |
           apk=app/build/outputs/apk/release/app-release.apk
           if [ ! -f "$apk" ]; then echo "signed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
-          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
-          got="$("$apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          apksigner="$(find "$sdk/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$apksigner" ]; then echo "::error::No apksigner under $sdk/build-tools"; exit 1; fi
+          echo "Using $apksigner"
+          if ! out="$("$apksigner" verify --print-certs "$apk" 2>&1)"; then
+            echo "$out"
+            echo "::error::apksigner couldn't verify the release APK: $(printf '%s' "$out" | head -3 | tr '\n' ' ')"
+            exit 1
+          fi
+          # Older apksigner prints "Signer #1 certificate SHA-256 digest: ...", newer "V2 Signer: certificate
+          # SHA-256 digest: ..." (one line per scheme). Every signer listed must be the release key.
+          got="$(printf '%s\n' "$out" | sed -n 's/^.*certificate SHA-256 digest: //p' | sort -u)"
           want="$(tr -d ' \n' < app/signing/release-cert.sha256)"
           if [ "$got" != "$want" ]; then
-            echo "::error::The release APK is signed with an unexpected key (SHA-256 $got)"
+            echo "$out"
+            echo "::error::The release APK is signed with an unexpected key (SHA-256 '$got'): $(printf '%s' "$out" | head -3 | tr '\n' ' ')"
             exit 1
           fi
           echo "::notice::Release APK signed with the release key (SHA-256 $got)"
