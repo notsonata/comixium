@@ -42,6 +42,10 @@ class WebEngine(private val app: Application) {
         private set
 
     val recentSearches = RecentSearches(prefs)
+    val reader = ReaderPrefs(prefs)
+
+    /** The tab currently on screen (null on native-only screens); used for hardware keys. */
+    var activeTab: WebTab? = null
 
     private val tabs = linkedMapOf<String, WebTab>()
 

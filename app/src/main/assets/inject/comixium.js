@@ -192,6 +192,20 @@
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
       return d;
     },
+    /*
+     * One step forward (dir=1) or back (dir=-1) in the chapter reader, through the reader's own
+     * keyboard shortcuts so its settings apply: ArrowDown/ArrowUp scroll a long strip by the
+     * user's scroll distance; s/w turn pages in paged mode regardless of reading direction.
+     */
+    readerStep: function (dir) {
+      var r = document.querySelector('.rpage');
+      if (!r) return false;
+      var paged = !r.classList.contains('rpage--long-strip');
+      var key = paged ? (dir > 0 ? 's' : 'w') : (dir > 0 ? 'ArrowDown' : 'ArrowUp');
+      var code = paged ? (dir > 0 ? 'KeyS' : 'KeyW') : key;
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: key, code: code, bubbles: true, cancelable: true }));
+      return true;
+    },
     scrollByPage: function (dir) {
       window.scrollBy({ top: dir * window.innerHeight * 0.85, behavior: 'smooth' });
       return true;

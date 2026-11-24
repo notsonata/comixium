@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +24,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import android.app.Activity
+import android.view.WindowManager
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.web.AuthState
 import com.notsonata.comixium.web.WebEngine
@@ -56,6 +64,11 @@ fun ComixiumApp(engine: WebEngine) {
         else -> webTab(selected)
     }
     val reader = current?.isReader == true
+    SideEffect { engine.activeTab = current }
+    ReaderWindowEffects(
+        immersive = reader && engine.reader.immersive,
+        keepScreenOn = reader && engine.reader.keepScreenOn,
+    )
 
     // Account pages depend on who is logged in: refresh them when that changes.
     LaunchedEffect(auth) {
@@ -157,6 +170,7 @@ fun ComixiumApp(engine: WebEngine) {
                     onSiteSettings = { siteAction("openSettings") },
                     onAdBlock = engine::updateAdBlock,
                     onDomain = engine::switchDomain,
+                    reader = engine.reader,
                     onClearCache = {
                         engine.clearCache()
                         Toast.makeText(context, "Cache cleared", Toast.LENGTH_SHORT).show()
@@ -196,3 +210,22 @@ private fun listSaver() = androidx.compose.runtime.saveable.listSaver<androidx.c
     save = { list -> list.map { it.name } },
     restore = { names -> mutableStateListOf(*names.mapNotNull { n -> AppTab.entries.firstOrNull { it.name == n } }.toTypedArray()) },
 )
+
+/** Reader pages: hide the status and navigation bars (swipe to peek) and keep the screen awake. */
+@Composable
+private fun ReaderWindowEffects(immersive: Boolean, keepScreenOn: Boolean) {
+    val view = LocalView.current
+    val window = (view.context as? Activity)?.window ?: return
+    DisposableEffect(immersive) {
+        val controller = WindowCompat.getInsetsController(window, view)
+        if (immersive) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { if (immersive) controller.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+    DisposableEffect(keepScreenOn) {
+        if (keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { if (keepScreenOn) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+}

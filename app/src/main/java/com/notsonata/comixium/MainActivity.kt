@@ -2,6 +2,7 @@ package com.notsonata.comixium
 
 import android.graphics.Color
 import android.os.Bundle
+import android.view.KeyEvent
 import android.webkit.CookieManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -34,6 +35,24 @@ class MainActivity : ComponentActivity() {
                 ComixiumApp(engine)
             }
         }
+    }
+
+    /** Volume keys step through a chapter (when enabled and a reader page is on screen). */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        if (code == KeyEvent.KEYCODE_VOLUME_DOWN || code == KeyEvent.KEYCODE_VOLUME_UP) {
+            val tab = engine.activeTab
+            if (engine.reader.volumeKeys && tab != null && tab.isReader) {
+                // Consume both down and up so the system volume doesn't change; act on presses
+                // and on every few repeats while held.
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount % 3 == 0) {
+                    val dir = if (code == KeyEvent.KEYCODE_VOLUME_DOWN) 1 else -1
+                    tab.js("window.__comixium && window.__comixium.readerStep($dir)")
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onResume() {
