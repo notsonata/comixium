@@ -70,7 +70,7 @@ Pick Mihon instead if you want one library across many sites, chapters downloade
 
 - Share any series; long-press an image to save or share it
 - Downloads and library backups work
-- comix links from other apps open in Comixium
+- comix links from other apps can open in Comixium (on Android 12 and up, turn on its links under App info → Open by default)
 - Hide the home page announcements and share bar
 
 ## Install
