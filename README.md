@@ -46,6 +46,18 @@ updates its release too. To ship a new version, bump `appVersion` in `app/build.
 (`versionCode` follows from it) and add a matching `## x.y.z` section to the changelog; CI
 fails without one. A merge that doesn't bump the version rebuilds that version's release.
 
+## Site check
+
+The app hooks into a few parts of the site (header buttons, dialog and reader class names,
+chapter URL format, reader keyboard shortcuts, theme variables). `.github/workflows/site-check.yml`
+runs every day: it loads the live site at phone size with the app's injected script and checks
+each hook. If something changed, it opens an issue listing what broke and which app feature it
+affects (GitHub emails you), and closes it once the check passes again. Run it locally with:
+
+```bash
+cd scripts/site-check && npm install && npx playwright install chromium && node check.mjs
+```
+
 ## Build
 
 Requirements: JDK 17+ and the Android SDK (`ANDROID_HOME` set, or `sdk.dir` in `local.properties`).
