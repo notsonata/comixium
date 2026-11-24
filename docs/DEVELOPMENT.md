@@ -35,9 +35,28 @@ Requirements: JDK 17+ and the Android SDK (`ANDROID_HOME`, or `sdk.dir` in `loca
 ./gradlew assembleRelease
 ```
 
-The APK lands in `app/build/outputs/apk/release/`. It is signed with the key in `app/signing/`,
-committed on purpose: this is a single-user, sideloaded app, and a stable key is what lets
-updates install in place.
+The APK lands in `app/build/outputs/apk/release/`. Without the release key it comes out unsigned
+(`app-release-unsigned.apk`); debug builds (`assembleDebug`) use the standard debug key.
+
+## Signing
+
+The release key is never committed. `app/signing/release-cert.sha256` (public) is the SHA-256 of
+its certificate; CI checks every release APK against it before publishing.
+
+- **Locally:** put `release.jks` and `release.properties` in `app/signing/` (both gitignored).
+- **CI:** the `SIGNING_BUNDLE` Actions secret is a base64 `.tar.gz` of those two files, unpacked
+  into `app/signing/` before the build. Pull requests from forks don't get secrets, so they build
+  unsigned and never publish. A push to `main` without a signed APK fails instead of publishing.
+
+To make the secret from the two files:
+
+```bash
+tar -czf - -C app/signing release.jks release.properties | base64 -w0
+```
+
+Keep a copy of the key somewhere safe: GitHub can't show a secret again, and without the key
+no update can install over the current release. Until 1.7.0 the key was committed to the repo,
+so that old key is retired; never sign with it again.
 
 ## Tests
 
@@ -93,7 +112,7 @@ Changelog style: short headed bullet lists, no first person.
 | `app/src/main/java/.../web` | Web engine: tabs, Back, links, ad blocker, prefs, downloads |
 | `app/src/main/assets/inject` | Page script and stylesheet injected into comix pages |
 | `app/src/main/assets/adblock` | Ad and tracker host list |
-| `app/signing` | Release keystore and its properties |
+| `app/signing` | Release key certificate fingerprint; the key itself stays out of the repo |
 | `art/` | Logo source |
 | `docs/` | README images and this guide |
 | `scripts/` | Release notes extraction, site check |

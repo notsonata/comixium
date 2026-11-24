@@ -350,7 +350,7 @@
   var drag = null;
   function sheetFor(t) {
     if (!prefs.mobile || !t || !t.closest) return null;
-    return t.closest('.minidlg__panel') || t.closest('.rpage-cmpanel.is-open') || t.closest('.settings-dialog__panel');
+    return t.closest('.minidlg__panel') || t.closest('.rpage-cmpanel.is-open');
   }
   function scrollerIn(el, sheet) {
     for (var n = el; n && n !== sheet.parentElement; n = n.parentElement) {
@@ -617,6 +617,14 @@
   function dialogOpen() {
     return !!openOverlay();
   }
+  // A view inside the site's settings (Content preferences, Custom theme) has its own back button;
+  // its title goes to the app's top bar and Back returns to the main settings view.
+  function settingsSubpage() {
+    var d = document.querySelector('.settings-dialog');
+    if (!d || !d.querySelector('.settings-dialog__back')) return '';
+    var h = d.querySelector('.settings-dialog__title');
+    return h ? h.textContent.trim() : '';
+  }
   function snapshot() {
     var b = document.body;
     return {
@@ -626,6 +634,7 @@
       reader: !!(b && b.classList.contains('rpage-body')),
       auth: auth(),
       dialog: dialogOpen(),
+      sub: settingsSubpage(),
       tone: document.documentElement.getAttribute('data-tone') || '',
       theme: theme(),
       traps: trapsRemoved
@@ -751,6 +760,8 @@
     closeDialog: function () {
       var o = openOverlay();
       if (!o) return false;
+      var sub = o.querySelector('.settings-dialog__back');
+      if (sub) { sub.click(); return true; }
       var btn = o.querySelector('.auth__close, .settings-dialog__close, .rpage-modal__close, [aria-label^="Close"], [aria-label^="close"]');
       if (btn) { btn.click(); return true; }
       if (o.matches('.rpage-cmpanel')) {

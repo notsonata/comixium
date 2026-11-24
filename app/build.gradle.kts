@@ -8,17 +8,19 @@ plugins {
 
 // Bump this (and only this) to release a new version. CI tags the release v<appVersion>,
 // and versionCode follows automatically (1.2.3 -> 10203) so every bump installs as an update.
-val appVersion = "1.6.0"
+val appVersion = "1.7.0"
 val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
     major * 10_000 + minor * 100 + patch
 }
 
-// The release key lives in the (private) repo on purpose: this is a single-user,
-// sideloaded app, and a stable key lets every new APK install over the previous one.
+// The release key is never committed. Locally it sits in app/signing/ (gitignored); CI unpacks the
+// SIGNING_BUNDLE secret there before building. Without it the release APK comes out unsigned
+// (fresh clones, pull requests from forks), and CI refuses to publish it.
 val signingProps = Properties().apply {
     val f = file("signing/release.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
+val releaseKeystore = signingProps.getProperty("storeFile")?.let { file(it) }?.takeIf { it.exists() }
 
 android {
     namespace = "com.notsonata.comixium"
@@ -35,11 +37,13 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file(signingProps.getProperty("storeFile"))
-            storePassword = signingProps.getProperty("storePassword")
-            keyAlias = signingProps.getProperty("keyAlias")
-            keyPassword = signingProps.getProperty("keyPassword")
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
         }
     }
 
@@ -48,13 +52,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            // Same key as release so a debug build can be sanity-checked on the same device.
-            signingConfig = signingConfigs.getByName("release")
         }
     }
 

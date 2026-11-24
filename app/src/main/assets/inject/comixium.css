@@ -444,33 +444,50 @@ html[data-cx-mobile] .mpage__badges {
   margin: 0 !important;
 }
 
-/* The site's settings (theme, content filter) as a bottom sheet; Done closes it, so no ✕. */
-html[data-cx-mobile] .settings-dialog {
-  place-items: end stretch !important;
+/* The site's settings (theme, content filter) as a full page under the app's top bar, which shows
+   the page title and Back. Choices apply as they're tapped, so there's no Done button either.
+   Not tied to mobile optimizations: More is the only way in, and it opens a page. */
+.settings-dialog {
+  place-items: stretch !important;
   padding: 0 !important;
+  background: var(--bg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
-html[data-cx-mobile] .settings-dialog__panel {
+.settings-dialog__panel {
   width: 100% !important;
-  max-height: 92dvh;
-  border-radius: 16px 16px 0 0 !important;
-  animation: cx-sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards !important;
+  max-width: none !important;
+  height: 100dvh !important;
+  max-height: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: var(--bg) !important;
+  animation: cx-page-in 0.16s ease-out backwards !important;
 }
-html[data-cx-mobile] .settings-dialog__panel::before {
-  content: "";
-  display: block;
-  flex: none;
-  width: 36px;
-  height: 4px;
-  margin: 8px auto 0;
-  border-radius: 2px;
-  background: rgb(var(--text-rgb) / 0.25);
+@keyframes cx-page-in {
+  from { opacity: 0; }
 }
-html[data-cx-mobile] .settings-dialog__close {
+.settings-dialog__title,
+.settings-dialog__back,
+.settings-dialog__close,
+.settings-dialog__save {
   display: none !important;
 }
-html[data-cx-mobile] .settings-dialog__head {
-  padding-top: 10px;
+.settings-dialog__head {
+  min-height: 0 !important;
+  padding: 14px 16px 2px !important;
+  border: 0 !important;
+  background: none !important;
 }
-html[data-cx-mobile] .settings-dialog__foot {
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+.settings-dialog__body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  padding: 12px 16px 24px !important;
+}
+.settings-dialog__foot {
+  justify-content: flex-start !important;
+  padding: 6px 16px max(6px, env(safe-area-inset-bottom)) !important;
+  border-top: 1px solid rgb(var(--text-rgb) / 0.08) !important;
+  background: var(--bg) !important;
 }

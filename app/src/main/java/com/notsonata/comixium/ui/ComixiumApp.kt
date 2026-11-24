@@ -27,7 +27,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -38,6 +40,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
@@ -86,6 +89,12 @@ private fun AppContent(engine: WebEngine) {
 
     fun webTab(t: AppTab): WebTab = engine.tab(t.name, t.startPath)
     val moreTab = engine.tab(MORE_PAGE, null)
+    /**
+     * Theme & content filter: the site's settings dialog, styled as a full page (comixium.css) and
+     * shown on the More stack. Leaving the page closes the dialog, and the dialog closing leaves the page.
+     */
+    var siteSettingsPage by rememberSaveable { mutableStateOf(false) }
+    var siteSettingsShown by remember { mutableStateOf(false) }
     val auth = engine.auth
 
     val current: WebTab? = when {
@@ -123,7 +132,12 @@ private fun AppContent(engine: WebEngine) {
     fun select(t: AppTab) {
         if (t == selected) {
             when {
-                t == AppTab.MORE -> { morePageOpen = false; settingsOpen = false }
+                t == AppTab.MORE -> {
+                    if (siteSettingsPage && moreTab.dialogOpen) moreTab.js("window.__comixium && window.__comixium.closeDialog()")
+                    siteSettingsPage = false
+                    morePageOpen = false
+                    settingsOpen = false
+                }
                 else -> webTab(t).goRoot()
             }
             return
@@ -132,28 +146,25 @@ private fun AppContent(engine: WebEngine) {
         if (t !in visited) visited += t
     }
 
-    /** The More page was opened only to show the site's settings sheet; leave it when the sheet closes. */
-    var moreSheet by rememberSaveable { mutableStateOf(false) }
-    var moreSheetShown by remember { mutableStateOf(false) }
-    LaunchedEffect(moreTab.dialogOpen, moreSheet) {
-        if (!moreSheet) return@LaunchedEffect
-        if (moreTab.dialogOpen) moreSheetShown = true
-        else if (moreSheetShown) { moreSheetShown = false; moreSheet = false; morePageOpen = false }
+    LaunchedEffect(moreTab.dialogOpen, siteSettingsPage) {
+        if (!siteSettingsPage) return@LaunchedEffect
+        if (moreTab.dialogOpen) siteSettingsShown = true
+        else if (siteSettingsShown) { siteSettingsShown = false; siteSettingsPage = false; morePageOpen = false }
     }
 
     fun openInMore(path: String) {
+        siteSettingsPage = false
         moreTab.open(path)
         morePageOpen = true
         if (AppTab.MORE !in visited) visited += AppTab.MORE
         selected = AppTab.MORE
     }
 
-    /** The site's theme and content filter sheet, opened from More over a page in the More stack. */
     fun openSiteSettings() {
         if (moreTab.isCreated && !moreTab.isReader) moreTab.siteAction("openSettings")
         else moreTab.openWithAction("/", "openSettings")
-        moreSheet = true
-        moreSheetShown = false
+        siteSettingsPage = true
+        siteSettingsShown = false
         morePageOpen = true
         if (AppTab.MORE !in visited) visited += AppTab.MORE
         selected = AppTab.MORE
@@ -170,8 +181,16 @@ private fun AppContent(engine: WebEngine) {
 
     fun back(): Boolean {
         if (searchOpen) { searchOpen = false; return true }
+        if (siteSettingsPage && selected == AppTab.MORE && morePageOpen) {
+            // A view inside the settings (Content preferences) goes back to the main view first.
+            if (moreTab.dialogSubpage.isNotEmpty()) return moreTab.handleBack()
+            if (moreTab.dialogOpen) moreTab.js("window.__comixium && window.__comixium.closeDialog()")
+            siteSettingsPage = false
+            morePageOpen = false
+            return true
+        }
         if (current?.handleBack() == true) return true
-        if (selected == AppTab.MORE && morePageOpen) { morePageOpen = false; moreSheet = false; return true }
+        if (selected == AppTab.MORE && morePageOpen) { morePageOpen = false; return true }
         if (selected == AppTab.MORE && settingsOpen) { settingsOpen = false; return true }
         if (selected != AppTab.HOME) { selected = AppTab.HOME; return true }
         return false
@@ -188,7 +207,8 @@ private fun AppContent(engine: WebEngine) {
     PredictiveBackHandler(enabled = canHandleBack) { events ->
         try {
             // Closing a popup or search isn't a page change: no preview for those.
-            val preview = engine.appPrefs.backAnimation && !searchOpen && current?.dialogOpen != true
+            val leavesSettingsPage = siteSettingsPage && current === moreTab && moreTab.dialogSubpage.isEmpty()
+            val preview = engine.appPrefs.backAnimation && !searchOpen && (current?.dialogOpen != true || leavesSettingsPage)
             events.collect { e ->
                 backFromLeft = e.swipeEdge == BackEventCompat.EDGE_LEFT
                 if (preview) backAnim.snapTo(BACK_EASING.transform(e.progress))
@@ -210,7 +230,8 @@ private fun AppContent(engine: WebEngine) {
             if (!reader) {
                 val atRoot = current?.isAtRoot ?: true
                 val title = when {
-                    moreSheet && selected == AppTab.MORE && morePageOpen -> "Theme & content filter"
+                    siteSettingsPage && selected == AppTab.MORE && morePageOpen ->
+                        moreTab.dialogSubpage.ifBlank { "Theme & content filter" }
                     selected == AppTab.MORE && settingsOpen && current == null -> "Settings"
                     current == null -> selected.label
                     else -> current.displayTitle.ifBlank { if (atRoot) selected.label else "" }
@@ -264,6 +285,12 @@ private fun AppContent(engine: WebEngine) {
             if (AppTab.MORE in visited && (moreTab.isCreated || morePageOpen)) {
                 val visible = selected == AppTab.MORE && morePageOpen
                 WebTabView(moreTab, engine, Modifier.fillMaxSize().zIndex(if (visible) 1f else 0f), visible = visible)
+                // Covers the page underneath until the settings page is up, so it never flashes by.
+                if (visible && siteSettingsPage && !siteSettingsShown) {
+                    Box(Modifier.fillMaxSize().zIndex(1.5f).background(c.bg), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(24.dp), color = c.accent, strokeWidth = 2.dp)
+                    }
+                }
             }
             if (selected == AppTab.MORE && !morePageOpen) Box(Modifier.fillMaxSize().zIndex(2f)) {
                 if (settingsOpen) {

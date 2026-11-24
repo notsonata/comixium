@@ -13,3 +13,9 @@
 *.aab
 /scripts/site-check/node_modules/
 /scripts/site-check/package-lock.json
+
+# The release key is never committed (see docs/DEVELOPMENT.md, "Signing").
+/app/signing/release.jks
+/app/signing/release.properties
+*.jks
+*.keystore
