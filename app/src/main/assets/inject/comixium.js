@@ -350,7 +350,7 @@
   var drag = null;
   function sheetFor(t) {
     if (!prefs.mobile || !t || !t.closest) return null;
-    return t.closest('.minidlg__panel') || t.closest('.rpage-cmpanel.is-open');
+    return t.closest('.minidlg__panel') || t.closest('.rpage-cmpanel.is-open') || t.closest('.settings-dialog__panel');
   }
   function scrollerIn(el, sheet) {
     for (var n = el; n && n !== sheet.parentElement; n = n.parentElement) {
@@ -507,6 +507,21 @@
     setAttr(el, 'data-cx-more', start && end ? 'both' : start ? 'start' : end ? 'end' : null);
   }
 
+  // --- Series page header: keep badges and stats beside the cover only if they fit ------------
+  function fitSeriesHeader() {
+    var hero = document.querySelector('.mpage__hero-inner');
+    if (!hero) return;
+    if (!prefs.mobile) { hero.classList.remove('cx-head-stacked'); return; }
+    var poster = hero.querySelector('.mpage__poster');
+    var parts = ['.mpage__title-row', '.mpage__badges', '.mpage__byline'].map(function (sel) { return hero.querySelector(sel); });
+    if (!poster || !parts[0]) return;
+    hero.classList.remove('cx-head-stacked'); // measure the side-by-side layout
+    var bottom = 0;
+    for (var i = 0; i < parts.length; i++) if (parts[i]) bottom = Math.max(bottom, parts[i].getBoundingClientRect().bottom);
+    if (bottom > poster.getBoundingClientRect().bottom + 2) hero.classList.add('cx-head-stacked');
+  }
+  window.addEventListener('resize', function () { fitSeriesHeader(); });
+
   // --- Home page: dismissible announcement and share bar -------------------------------------
   var DISMISSED_KEY = 'comixium.dismissed';
   function loadDismissed() {
@@ -625,6 +640,7 @@
     markScrollers();
     homeBlocks();
     readerSettingsSections();
+    fitSeriesHeader();
     var s = snapshot();
     var key = JSON.stringify(s);
     if (key !== last) { last = key; post(s); }
@@ -763,6 +779,7 @@
       markScrollers();
       homeBlocks();
       readerSettingsSections();
+      fitSeriesHeader();
       return true;
     },
     scrollByPage: function (dir) {

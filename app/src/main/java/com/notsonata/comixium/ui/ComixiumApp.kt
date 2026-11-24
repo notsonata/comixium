@@ -127,8 +127,28 @@ private fun AppContent(engine: WebEngine) {
         if (t !in visited) visited += t
     }
 
+    /** The More page was opened only to show the site's settings sheet; leave it when the sheet closes. */
+    var moreSheet by rememberSaveable { mutableStateOf(false) }
+    var moreSheetShown by remember { mutableStateOf(false) }
+    LaunchedEffect(moreTab.dialogOpen, moreSheet) {
+        if (!moreSheet) return@LaunchedEffect
+        if (moreTab.dialogOpen) moreSheetShown = true
+        else if (moreSheetShown) { moreSheetShown = false; moreSheet = false; morePageOpen = false }
+    }
+
     fun openInMore(path: String) {
         moreTab.open(path)
+        morePageOpen = true
+        if (AppTab.MORE !in visited) visited += AppTab.MORE
+        selected = AppTab.MORE
+    }
+
+    /** The site's theme and content filter sheet, opened from More over a page in the More stack. */
+    fun openSiteSettings() {
+        if (moreTab.isCreated && !moreTab.isReader) moreTab.siteAction("openSettings")
+        else moreTab.openWithAction("/", "openSettings")
+        moreSheet = true
+        moreSheetShown = false
         morePageOpen = true
         if (AppTab.MORE !in visited) visited += AppTab.MORE
         selected = AppTab.MORE
@@ -146,7 +166,7 @@ private fun AppContent(engine: WebEngine) {
     fun back(): Boolean {
         if (searchOpen) { searchOpen = false; return true }
         if (current?.handleBack() == true) return true
-        if (selected == AppTab.MORE && morePageOpen) { morePageOpen = false; return true }
+        if (selected == AppTab.MORE && morePageOpen) { morePageOpen = false; moreSheet = false; return true }
         if (selected != AppTab.HOME) { selected = AppTab.HOME; return true }
         return false
     }
@@ -183,6 +203,7 @@ private fun AppContent(engine: WebEngine) {
             if (!reader) {
                 val atRoot = current?.isAtRoot ?: true
                 val title = when {
+                    moreSheet && selected == AppTab.MORE && morePageOpen -> "Theme & content filter"
                     current == null -> selected.label
                     else -> current.displayTitle.ifBlank { if (atRoot) selected.label else "" }
                 }
@@ -192,8 +213,7 @@ private fun AppContent(engine: WebEngine) {
                     showBrand = selected == AppTab.HOME && current != null && atRoot,
                     auth = auth,
                     onBack = { back() },
-                    onSearch = { searchOpen = true },
-                    onSettings = { siteAction("openSettings") },
+                    onSearch = if (Site.pathOnly(current?.url).startsWith("/browse")) null else ({ searchOpen = true }),
                     onLogin = { siteAction("openLogin") },
                     onNotifications = { openInMore("/user?tab=notifs") },
                     onProfile = { openInMore("/user") },
@@ -246,7 +266,7 @@ private fun AppContent(engine: WebEngine) {
                     onLogin = { siteAction("openLogin") },
                     onRegister = { siteAction("openRegister") },
                     onSignOut = { siteAction("signOut") },
-                    onSiteSettings = { siteAction("openSettings") },
+                    onSiteSettings = ::openSiteSettings,
                     onAdBlock = engine::updateAdBlock,
                     onDomain = engine::switchDomain,
                     reader = engine.reader,

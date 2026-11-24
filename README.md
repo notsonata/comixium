@@ -100,7 +100,7 @@ The app hooks into parts of the site, and a daily check flags when comix changes
 <details>
 <summary><b>Where are the settings?</b></summary>
 <br>
-While reading, the gear in the reader controls opens every reader option in one sheet: tapping, volume keys, zoom, full screen, controls layout and the site's own reader settings. The More tab has the same reader options plus home page blocks, ad blocking, mobile optimizations, domain and cache. The site's general settings (theme, content filter) open from the gear in the top bar.
+While reading, the gear in the reader controls opens every reader option in one sheet: tapping, volume keys, zoom, full screen, controls layout and the site's own reader settings. The More tab has the same reader options plus home page blocks, ad blocking, mobile optimizations, domain and cache. The site's general settings (theme, content filter) open from More → Theme & content filter, as a sheet you swipe down to close.
 </details>
 
 <details>

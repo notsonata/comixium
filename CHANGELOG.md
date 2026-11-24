@@ -12,6 +12,20 @@ Reader:
 - Choose which control buttons to show with checkboxes
 - Reading position stays put when something on the page loads or changes size
 
+Series page (mobile optimizations):
+
+- Title sits next to the cover, with tags, rank and score below it
+- Tags, rank and score move under the cover when the title is long
+
+Top bar:
+
+- Settings gear removed; theme and content filter live in More
+- No search icon on Browse, which has its own search box
+
+Theme & content filter:
+
+- Opens as a bottom sheet that closes with a swipe down or Back
+
 ## 1.4.0
 
 Reader settings:

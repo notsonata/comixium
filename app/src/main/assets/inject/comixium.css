@@ -398,3 +398,79 @@ html[data-cx-mobile] .minidlg__panel::before {
   from { transform: translateY(100%); }
   to { transform: none; }
 }
+
+/* Series page header: title beside the cover, then badges and rank/score under it. If they don't
+   fit beside the cover (long titles), the page script adds .cx-head-stacked and they move to
+   full-width rows underneath. Story/art, alternative titles and the buttons stay where they were. */
+html[data-cx-mobile] .mpage__hero-inner {
+  grid-template:
+    "poster title" auto
+    "poster badges" auto
+    "poster byline" 1fr
+    "credits credits"
+    "alts alts"
+    "cta cta"
+    "desc desc"
+    "details details"
+    "share share"
+    "note note" / 120px minmax(0, 1fr) !important;
+  row-gap: 8px !important;
+}
+html[data-cx-mobile] .mpage__hero-inner.cx-head-stacked {
+  grid-template:
+    "poster title" 1fr
+    "badges badges"
+    "byline byline"
+    "credits credits"
+    "alts alts"
+    "cta cta"
+    "desc desc"
+    "details details"
+    "share share"
+    "note note" / 120px minmax(0, 1fr) !important;
+}
+html[data-cx-mobile] .mpage__title-row {
+  margin-top: 0 !important;
+  align-self: start;
+}
+html[data-cx-mobile] .mpage__title-row .mpage__title {
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+}
+html[data-cx-mobile] .mpage__hero-inner.cx-head-stacked .mpage__title-row {
+  align-self: center;
+}
+html[data-cx-mobile] .mpage__badges {
+  margin: 0 !important;
+}
+
+/* The site's settings (theme, content filter) as a bottom sheet; Done closes it, so no ✕. */
+html[data-cx-mobile] .settings-dialog {
+  place-items: end stretch !important;
+  padding: 0 !important;
+}
+html[data-cx-mobile] .settings-dialog__panel {
+  width: 100% !important;
+  max-height: 92dvh;
+  border-radius: 16px 16px 0 0 !important;
+  animation: cx-sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards !important;
+}
+html[data-cx-mobile] .settings-dialog__panel::before {
+  content: "";
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 0;
+  border-radius: 2px;
+  background: rgb(var(--text-rgb) / 0.25);
+}
+html[data-cx-mobile] .settings-dialog__close {
+  display: none !important;
+}
+html[data-cx-mobile] .settings-dialog__head {
+  padding-top: 10px;
+}
+html[data-cx-mobile] .settings-dialog__foot {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
