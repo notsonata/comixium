@@ -47,7 +47,13 @@ try {
     process.exit(2);
   }
   check('App page script runs', await page.evaluate(() => !!window.__comixium), errors.join('; '), 'everything below');
-  check('Header `.topnav`', await page.$('.topnav'), '', 'native top bar replaces it; site header would show twice');
+  const diag = await page.evaluate(() => JSON.stringify({
+    url: location.href, title: document.title,
+    top: [...(document.querySelector('#app-root') || document.body).children].slice(0, 6).map(e => e.tagName + '.' + e.className).join(' '),
+    css: document.styleSheets.length, bg: getComputedStyle(document.documentElement).getPropertyValue('--bg'),
+    text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 160),
+  }));
+  check('Header `.topnav`', await page.$('.topnav'), diag, 'native top bar replaces it; site header would show twice');
   check('Header hidden by app stylesheet', await page.evaluate(() => getComputedStyle(document.querySelector('.topnav') || document.body).visibility === 'hidden'), '', 'double header');
   check('Log in button `.topnav .login-btn`', await page.$('.topnav .login-btn'), '', 'native Log in button, logged-in detection, Library/History prompt');
   check('Settings button `.topnav .settings button`', await page.$('.topnav .settings button'), '', 'native site-settings button');
