@@ -132,4 +132,9 @@ if (failed.length) {
 lines.push('## All checks', '');
 results.forEach(r => lines.push(`- ${r.ok ? '✅' : '❌'} ${r.section}: ${r.name}`));
 console.log(lines.join('\n'));
+// On GitHub Actions, also surface each failure as an annotation on the run / pull request.
+if (process.env.GITHUB_ACTIONS) {
+  const esc = t => String(t).replace(/%/g, '%25').replace(/\r/g, '').replace(/\n/g, ' ');
+  failed.forEach(r => console.error(`::error title=Site check: ${esc(r.section)}::${esc(r.name)}. Affects: ${esc(r.affects)}. ${esc(r.detail).slice(0, 300)}`));
+}
 process.exit(failed.length ? 1 : 0);
