@@ -119,9 +119,15 @@ try {
     const chapterHref = await page.evaluate(() => (document.querySelector('a[href*="-chapter-"]') || {}).getAttribute?.('href'));
     check('Chapter links look like `/title/<slug>/<id>-chapter-<n>`', chapterHref && /^\/title\/[^/]+\/\d+-chapter-[^/?#]+\/?$/.test(chapterHref), chapterHref || 'none found', 'reader mode, Back treating chapters as one page');
 
-    // --- Reader -------------------------------------------------------------------------------
-    section = 'Reader';
-    if (chapterHref) {
+  }
+
+  // --- Reader -----------------------------------------------------------------------------------
+  // Uses the chapter found above, or a known one if the series page was behind a challenge.
+  section = 'Reader';
+  {
+    const chapterHref = (await page.evaluate(() => (document.querySelector('a[href*="-chapter-"]') || {}).getAttribute?.('href')).catch(() => null))
+      || '/title/9nej6-return-of-the-blossoming-blade/11578620-chapter-185';
+    {
       await open(chapterHref);
       check('Reader page marker `body.rpage-body`', await page.evaluate(() => document.body.classList.contains('rpage-body')), '', 'reader mode');
       check('Reader reported to the app', (await lastState())?.reader === true, '', 'full screen, keep screen on, volume keys');
