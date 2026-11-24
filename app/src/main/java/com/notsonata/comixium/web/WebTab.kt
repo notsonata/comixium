@@ -157,19 +157,24 @@ class WebTab(
         if (failed != null) webView.loadUrl(failed.url) else webView.reload()
     }
 
-    /** Back inside the page: closes a site dialog first, then walks the history. */
+    /** Back inside the page: closes a site dialog first, then goes to the previous page (see [BackStack]). */
     fun handleBack(): Boolean {
         if (dialogOpen) {
             js("window.__comixium && window.__comixium.closeDialog()")
             dialogOpen = false
             return true
         }
-        if (webView.canGoBack()) {
-            webView.goBack()
+        val list = webView.copyBackForwardList()
+        val target = backTarget(list)
+        if (target >= 0) {
+            webView.goBackOrForward(target - list.currentIndex)
             return true
         }
         return false
     }
+
+    private fun backTarget(list: android.webkit.WebBackForwardList = webView.copyBackForwardList()): Int =
+        BackStack.target((0 until list.size).map { list.getItemAtIndex(it)?.url }, list.currentIndex)
 
     fun js(script: String, callback: ((String?) -> Unit)? = null) {
         if (!created) return
@@ -353,14 +358,14 @@ class WebTab(
                 clearHistoryOnLoad = false
                 view.clearHistory()
             }
-            canGoBack = view.canGoBack()
+            canGoBack = backTarget() >= 0
             if (injectManually && Site.isSiteUrl(url)) view.evaluateJavascript(engine.pageScript, null)
             if (error == null && Site.isSiteUrl(url)) engine.onLoadSucceeded(Site.hostOf(url))
         }
 
         override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
             this@WebTab.url = url
-            canGoBack = view.canGoBack()
+            canGoBack = backTarget() >= 0
             isReader = Site.isReaderUrl(url)
         }
 
