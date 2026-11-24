@@ -110,7 +110,7 @@
   var prefs = {
     tapEdges: true, tapPaged: true, tapLayout: 'sides', tapZone: 'medium', invertTaps: false, controlsTap: 'double',
     pinchZoom: true, layout: 'rail', x: 'right', y: 'top', size: 'normal',
-    volume: 'on', immersive: true, keepOn: true, longPress: true, controlsHide: '',
+    volumeKeys: true, volumeInvert: false, immersive: true, keepOn: true, longPress: true, controlsHide: '',
     mobile: true, announce: true, share: true
   };
   var DEFAULTS = { layout: 'rail', x: 'right', y: 'top', size: 'normal' };
@@ -121,6 +121,10 @@
     if (p.layout === 'minimal') { // older "minimal" layout = rail with only the chapter switcher and settings
       p.layout = 'rail';
       if (p.controlsHide === undefined) p.controlsHide = 'home,series,comments,chapters,autoscroll';
+    }
+    if (typeof p.volume === 'string' && p.volumeKeys === undefined) { // older single "volume" setting
+      p.volumeKeys = p.volume !== 'off';
+      p.volumeInvert = p.volume === 'inverted';
     }
     // Turning announcements back on also brings back the ones dismissed one by one.
     if ((p.announce === true && prefs.announce === false) || p.clearDismissed) saveDismissed([]);
@@ -243,88 +247,137 @@
   // The reader's gear opens the site's settings (a bottom sheet with mobile optimizations); these
   // sections are appended to it in the same markup, so there is one place for every reader option.
   // Changes apply here at once and are sent to the app, which stores them and syncs other pages.
-  var ON_OFF = [[true, 'On'], [false, 'Off']];
-  var SETTINGS = [
-    ['Tap to turn pages (paged)', 'tapPaged', ON_OFF],
-    ['Tap to scroll (long strip)', 'tapEdges', ON_OFF],
-    ['Tap zones', 'tapLayout', [['sides', 'Left & right'], ['vertical', 'Top & bottom']]],
-    ['Tap zone size', 'tapZone', [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']]],
-    ['Tap direction', 'invertTaps', [[false, 'Normal'], [true, 'Inverted']]],
-    ['Show controls with', 'controlsTap', [['double', 'Double tap'], ['single', 'Single tap'], ['off', 'Off']]],
-    ['Volume keys', 'volume', [['on', 'Normal'], ['inverted', 'Inverted'], ['off', 'Off']]],
-    ['Pinch to zoom', 'pinchZoom', ON_OFF],
-    ['Long-press a page', 'longPress', [[true, 'Image menu'], [false, 'Nothing']]],
-    ['Full screen', 'immersive', ON_OFF],
-    ['Keep screen on', 'keepOn', ON_OFF],
-    ['Controls style', 'layout', [['rail', 'Rail'], ['bar', 'Bar']]],
-    ['Controls shown', 'controlsHide', 'checks'],
-    ['Controls position', 'y', [['top', 'Top'], ['bottom', 'Bottom']]],
-    ['Controls side', 'x', [['left', 'Left'], ['center', 'Center'], ['right', 'Right']]],
-    ['Controls size', 'size', [['normal', 'Normal'], ['large', 'Large']]]
+  // Laid out like the app's own settings: switches for on/off options, segmented choices, and chips
+  // for the buttons shown. Rows: [type, pref key, label, hint or options, only-when].
+  var SECTIONS = [
+    ['Tapping', [
+      ['switch', 'tapPaged', 'Tap to turn pages', 'Paged mode: tap the edges'],
+      ['switch', 'tapEdges', 'Tap to scroll', 'Long strip: tap the edges to move a screen'],
+      ['choice', 'tapLayout', 'Tap zones', [['sides', 'Left & right'], ['vertical', 'Top & bottom']], 'taps'],
+      ['choice', 'tapZone', 'Tap zone size', [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']], 'taps'],
+      ['switch', 'invertTaps', 'Invert tap zones', 'Left / top goes forward', 'taps'],
+      ['choice', 'controlsTap', 'Show controls with', [['double', 'Double tap'], ['single', 'Single tap'], ['off', 'Off']]]
+    ]],
+    ['Screen & keys', [
+      ['switch', 'immersive', 'Full screen', 'Hide the status and navigation bars'],
+      ['switch', 'keepOn', 'Keep screen on', 'While a chapter is open'],
+      ['switch', 'volumeKeys', 'Volume keys turn pages', 'Uses your scroll distance'],
+      ['switch', 'volumeInvert', 'Invert volume keys', 'Volume up goes forward', 'volume'],
+      ['switch', 'pinchZoom', 'Pinch to zoom', 'Zoom into a page with two fingers'],
+      ['switch', 'longPress', 'Long-press image menu', 'Save, share or copy a page']
+    ]],
+    ['Controls', [
+      ['choice', 'layout', 'Style', [['rail', 'Rail'], ['bar', 'Bar']]],
+      ['checks', 'controlsHide', 'Buttons shown', 'The settings button always stays'],
+      ['choice', 'y', 'Position', [['top', 'Top'], ['bottom', 'Bottom']]],
+      ['choice', 'x', 'Side', [['left', 'Left'], ['center', 'Center'], ['right', 'Right']], 'rail'],
+      ['choice', 'size', 'Size', [['normal', 'Normal'], ['large', 'Large']]]
+    ]]
   ];
-  var GESTURES_HINT = 'Swipe to turn pages or scroll, pinch to zoom, tap or drag the progress bar to jump, ' +
-    'and use Back to leave the chapter. Tap zones and the controls tap work as set above.';
-  function renderSettings() {
-    var out = '';
-    for (var i = 0; i < SETTINGS.length; i++) {
-      var key = SETTINGS[i][1];
-      if (key === 'x' && prefs.layout === 'bar') continue; // the bar always spans the width
-      if (SETTINGS[i][2] === 'checks') { out += renderControlChecks(SETTINGS[i][0]); continue; }
-      out += '<section class="rpage-settings__group cx-setting" data-key="' + key + '">' +
-        '<h3 class="rpage-settings__title mono">' + SETTINGS[i][0] + '</h3><div class="rpage-settings__opts">';
-      var opts = SETTINGS[i][2];
-      for (var j = 0; j < opts.length; j++) {
-        out += '<label class="rpage-opt' + (prefs[key] === opts[j][0] ? ' is-on' : '') + '" data-v="' + opts[j][0] + '">' +
-          '<span class="rpage-opt__dot" aria-hidden="true"></span><span>' + opts[j][1] + '</span></label>';
-      }
-      out += '</div></section>';
-    }
-    return out + '<p class="rpage-settings__hint">' + GESTURES_HINT + '</p>';
-  }
   // Which reader control buttons to show (the settings button always stays).
   var CONTROL_ITEMS = [
     ['chapter', 'Chapter switcher'], ['home', 'Home'], ['series', 'Series page'],
     ['comments', 'Comments'], ['chapters', 'Chapter list'], ['autoscroll', 'Auto-scroll']
   ];
+  var GESTURES_HINT = 'Swipe to turn pages or scroll, pinch to zoom, tap or drag the progress bar to jump, ' +
+    'and use Back to leave the chapter. Tap zones and the controls tap work as set above.';
+  var CHECK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" ' +
+    'stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function hiddenControls() {
     return prefs.controlsHide ? prefs.controlsHide.split(',') : [];
   }
-  function renderControlChecks(title) {
-    var hidden = hiddenControls();
-    var out = '<section class="rpage-settings__group cx-setting" data-key="controlsHide">' +
-      '<h3 class="rpage-settings__title mono">' + title + '</h3><div class="rpage-settings__opts cx-checks">';
-    for (var i = 0; i < CONTROL_ITEMS.length; i++) {
-      var on = hidden.indexOf(CONTROL_ITEMS[i][0]) < 0;
-      out += '<label class="rpage-opt' + (on ? ' is-on' : '') + '" data-check="' + CONTROL_ITEMS[i][0] + '">' +
-        '<span class="rpage-opt__check" aria-hidden="true">' + (on ? '\u2713' : '') + '</span><span>' + CONTROL_ITEMS[i][1] + '</span></label>';
-    }
-    return out + '</div><p class="rpage-settings__hint">The settings button always stays.</p></section>';
+  // Rows that only matter while another option is on are greyed out otherwise.
+  function rowEnabled(when) {
+    if (when === 'taps') return prefs.tapPaged || prefs.tapEdges;
+    if (when === 'volume') return prefs.volumeKeys;
+    if (when === 'rail') return prefs.layout !== 'bar'; // the bar always spans the width
+    return true;
   }
-  function onSettingClick(e) {
-    var check = e.target.closest && e.target.closest('.cx-setting [data-check]');
-    if (check) {
-      e.preventDefault();
-      e.stopPropagation();
-      var id = check.getAttribute('data-check');
-      var hidden = hiddenControls();
-      var at = hidden.indexOf(id);
-      if (at >= 0) hidden.splice(at, 1); else hidden.push(id);
-      var v = hidden.join(',');
-      window.__comixium.setPrefs({ controlsHide: v });
-      post({ t: 'pref', key: 'controlsHide', value: v });
-      return;
+  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+  function renderRow(r) {
+    var type = r[0], key = r[1];
+    if (type === 'switch') {
+      return '<div class="cx-row cx-row--switch" role="switch" tabindex="0" data-key="' + key + '" data-when="' + (r[4] || '') + '">' +
+        '<span class="cx-row__text"><span class="cx-row__label">' + esc(r[2]) + '</span>' +
+        '<span class="cx-row__hint">' + esc(r[3]) + '</span></span><span class="cx-switch" aria-hidden="true"></span></div>';
     }
-    var opt = e.target.closest && e.target.closest('.cx-setting .rpage-opt');
-    if (!opt) return;
-    e.preventDefault();
-    e.stopPropagation();
-    var key = opt.closest('.cx-setting').getAttribute('data-key');
-    var raw = opt.getAttribute('data-v');
-    var value = raw === 'true' ? true : raw === 'false' ? false : raw;
+    var out = '<div class="cx-row cx-row--choice" data-when="' + (r[4] || '') + '"><span class="cx-row__text">' +
+      '<span class="cx-row__label">' + esc(r[2]) + '</span>' + (type === 'checks' ? '<span class="cx-row__hint">' + esc(r[3]) + '</span>' : '') + '</span>';
+    if (type === 'checks') {
+      out += '<div class="cx-chips">';
+      for (var i = 0; i < CONTROL_ITEMS.length; i++) {
+        out += '<span class="cx-chip" role="checkbox" tabindex="0" data-check="' + CONTROL_ITEMS[i][0] + '">' + CHECK_SVG + esc(CONTROL_ITEMS[i][1]) + '</span>';
+      }
+      return out + '</div></div>';
+    }
+    out += '<div class="cx-seg" role="radiogroup" data-key="' + key + '">';
+    for (var j = 0; j < r[3].length; j++) {
+      out += '<span class="cx-seg__opt" role="radio" tabindex="0" data-v="' + r[3][j][0] + '">' + esc(r[3][j][1]) + '</span>';
+    }
+    return out + '</div></div>';
+  }
+  function renderSettings() {
+    var out = '';
+    for (var i = 0; i < SECTIONS.length; i++) {
+      out += '<section class="rpage-settings__group cx-group"><h3 class="rpage-settings__title mono">' + SECTIONS[i][0] + '</h3><div class="cx-card">';
+      for (var j = 0; j < SECTIONS[i][1].length; j++) out += renderRow(SECTIONS[i][1][j]);
+      out += '</div></section>';
+    }
+    return out + '<p class="rpage-settings__hint">' + GESTURES_HINT + '</p>';
+  }
+  // Rows are drawn once and then updated in place, so switches animate instead of being redrawn.
+  function syncSettings(box) {
+    var i, el;
+    var rows = box.querySelectorAll('.cx-row');
+    for (i = 0; i < rows.length; i++) rows[i].classList.toggle('is-disabled', !rowEnabled(rows[i].getAttribute('data-when')));
+    var switches = box.querySelectorAll('.cx-row--switch');
+    for (i = 0; i < switches.length; i++) {
+      el = switches[i];
+      setAttr(el, 'aria-checked', prefs[el.getAttribute('data-key')] ? 'true' : 'false');
+    }
+    var opts = box.querySelectorAll('.cx-seg__opt');
+    for (i = 0; i < opts.length; i++) {
+      el = opts[i];
+      var on = String(prefs[el.parentElement.getAttribute('data-key')]) === el.getAttribute('data-v');
+      el.classList.toggle('is-on', on);
+      setAttr(el, 'aria-checked', on ? 'true' : 'false');
+    }
+    var hidden = hiddenControls();
+    var chips = box.querySelectorAll('.cx-chip');
+    for (i = 0; i < chips.length; i++) {
+      el = chips[i];
+      var shown = hidden.indexOf(el.getAttribute('data-check')) < 0;
+      el.classList.toggle('is-on', shown);
+      setAttr(el, 'aria-checked', shown ? 'true' : 'false');
+    }
+  }
+  function changePref(key, value) {
     var change = {};
     change[key] = value;
     window.__comixium.setPrefs(change);
     post({ t: 'pref', key: key, value: value });
+  }
+  function onSettingClick(e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var row = t.closest('.cx-row');
+    if (!row || row.classList.contains('is-disabled')) return;
+    var chip = t.closest('.cx-chip'), opt = t.closest('.cx-seg__opt');
+    if (chip) {
+      var hidden = hiddenControls(), id = chip.getAttribute('data-check'), at = hidden.indexOf(id);
+      if (at >= 0) hidden.splice(at, 1); else hidden.push(id);
+      changePref('controlsHide', hidden.join(','));
+    } else if (opt) {
+      var raw = opt.getAttribute('data-v');
+      changePref(opt.parentElement.getAttribute('data-key'), raw === 'true' ? true : raw === 'false' ? false : raw);
+    } else if (row.classList.contains('cx-row--switch')) {
+      var key = row.getAttribute('data-key');
+      changePref(key, !prefs[key]);
+    } else {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
   }
   function readerSettingsSections() {
     var body = document.querySelector('.rpage-settings__body');
@@ -336,8 +389,8 @@
       box.addEventListener('click', onSettingClick);
       body.appendChild(box);
     }
-    var html = renderSettings();
-    if (box.__html !== html) { box.innerHTML = html; box.__html = html; }
+    if (!box.firstChild) box.innerHTML = renderSettings();
+    syncSettings(box);
     // The site's own "Hide controls: single / double tap" no longer applies (the app handles
     // those taps; see "Show controls with"), so hide it rather than show two settings for one thing.
     var titles = body.querySelectorAll(':scope > .rpage-settings__group > .rpage-settings__title');

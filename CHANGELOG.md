@@ -2,6 +2,15 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.7.1
+
+Reader settings:
+
+- Redesigned: switches for on/off options, compact selectors for choices
+- Grouped into Tapping, Screen & keys, and Controls
+- Options that don't apply right now are greyed out, like tap zone size with tapping off
+- Pick the control buttons shown with chips
+
 ## 1.7.0
 
 New signing key:

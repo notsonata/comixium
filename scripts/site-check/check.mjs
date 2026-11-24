@@ -162,7 +162,7 @@ try {
       }
       await page.evaluate(() => document.querySelector('.rpage-floatctl button[aria-label="Settings"]')?.click()); await wait(700);
       check('Reader settings open as a bottom sheet (`.minidlg`)', await page.evaluate(() => { const p = document.querySelector('.minidlg__panel'); return !!p && Math.abs(p.getBoundingClientRect().bottom - innerHeight) < 2; }), '', 'reader panels as bottom sheets');
-      check('App options inside the reader settings sheet', await page.evaluate(() => document.querySelectorAll('.rpage-settings__body #cx-reader-settings .cx-setting').length > 10), '', 'reader settings (taps, volume, controls)');
+      check('App options inside the reader settings sheet', await page.evaluate(() => document.querySelectorAll('.rpage-settings__body #cx-reader-settings .cx-row').length > 10), '', 'reader settings (taps, volume, controls)');
       check('Reader settings sheet reported as a popup', (await lastState())?.dialog === true, '', 'Back closes popups first');
       await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
       check('Back helper closes the settings sheet', !(await page.$('.minidlg')), '', 'Back closes popups first');
