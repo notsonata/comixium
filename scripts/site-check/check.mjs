@@ -16,6 +16,7 @@ const inject = join(root, 'app/src/main/assets/inject');
 const BASE = (process.argv.includes('--base') ? process.argv[process.argv.indexOf('--base') + 1] : 'https://comix.ws').replace(/\/$/, '');
 const pageScript = readFileSync(join(inject, 'comixium.js'), 'utf8')
   .replace('__COMIXIUM_CSS__', JSON.stringify(readFileSync(join(inject, 'comixium.css'), 'utf8')));
+const collectScript = readFileSync(join(inject, 'collect.js'), 'utf8');
 
 const results = [];
 let section = '';
@@ -142,7 +143,13 @@ try {
     check('Series header parts (`.mpage__hero-inner`, `.mpage__poster`, `.mpage__title-row`)', await page.$('.mpage__hero-inner .mpage__poster') && await page.$('.mpage__hero-inner .mpage__title-row'), '', 'title beside the cover');
     check('Title sits beside the cover', await page.evaluate(() => { const p = document.querySelector('.mpage__poster'), t = document.querySelector('.mpage__title-row'); if (!p || !t) return false; const a = p.getBoundingClientRect(), b = t.getBoundingClientRect(); return b.left >= a.right - 1 && b.top < a.bottom; }), '', 'title beside the cover');
     const chapterHref = await page.evaluate(() => (document.querySelector('a[href*="-chapter-"]') || {}).getAttribute?.('href'));
-    check('Chapter links look like `/title/<slug>/<id>-chapter-<n>`', chapterHref && /^\/title\/[^/]+\/\d+-chapter-[^/?#]+\/?$/.test(chapterHref), chapterHref || 'none found', 'reader mode, Back treating chapters as one page');
+    checkData('Chapter links look like `/title/<slug>/<id>-chapter-<n>`', chapterHref && /^\/title\/[^/]+\/\d+-chapter-[^/?#]+\/?$/.test(chapterHref), chapterHref || 'none found', 'reader mode, Back treating chapters as one page');
+    checkData('Chapter rows (`.mchap-item` > `.mchap-row__primary`, `.mchap-bookmark`)', await page.$('.mchap-item a.mchap-row__primary[href*="-chapter-"]') && await page.$('.mchap-item > .mchap-bookmark'), '', 'download buttons on chapter rows');
+    checkData('Download button on each chapter row', await until(() => page.evaluate(() => document.querySelectorAll('.mchap-item > .cx-dl').length > 0)), '', 'downloads');
+    await page.evaluate(() => { window.__msgs.length = 0; document.querySelector('.mchap-item > .cx-dl')?.click(); });
+    const dl = await until(() => page.evaluate(() => window.__msgs.find(m => m.t === 'download') || null), 2000);
+    checkData('Download tap names the chapter, series and cover', dl && /-chapter-/.test(dl.path) && dl.label && dl.series && dl.cover,
+      dl ? JSON.stringify({ path: dl.path, label: dl.label, group: dl.group, series: dl.series }) : 'no message', 'downloads (labels, cover)');
 
   }
 
@@ -188,7 +195,34 @@ try {
       check('Comments panel opens as a bottom drawer (`.rpage-cmpanel`)', await page.evaluate(() => { const c = document.querySelector('.rpage-cmpanel.is-open'); if (!c) return false; const r = c.getBoundingClientRect(); return Math.abs(r.bottom - innerHeight) < 2 && Math.abs(r.width - innerWidth) < 2; }), '', 'comments drawer');
       await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
       check('Pinch zoom enabled on chapters', await page.evaluate(() => /user-scalable=yes/.test(document.querySelector('meta[name=viewport]').content)), '', 'pinch zoom');
+      check('Download button among the reader controls', await page.$('.rpage-floatctl__col .cx-dl-reader'), '', 'download from the reader');
+      check('Chapter title reads "<series> · <chapter>"', await page.evaluate(() => / · \S/.test(document.title)), await page.evaluate(() => document.title), 'download labels');
     }
+
+    // Downloads find a chapter's pages by letting the reader fill them in (collect.js), in a page
+    // of its own with every image answered by a placeholder, as the app does.
+    section = 'Downloads';
+    const dctx = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36',
+      viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true,
+    });
+    await dctx.addInitScript({ content: 'window.__got=[];window.ComixiumCollector={postMessage:function(s){window.__got.push(JSON.parse(s));}};' + collectScript });
+    const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+    await dctx.route('**/*', r => r.request().resourceType() === 'image' ? r.fulfill({ status: 200, contentType: 'image/png', body: pixel }) : r.continue());
+    const dpage = await dctx.newPage();
+    await dpage.goto(BASE + chapterHref, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    const end = await until(() => dpage.evaluate(() => window.__got.find(m => m.type !== 'progress') || null), 150000);
+    const ok = end && end.type === 'pages' && end.found === end.total && end.total > 0 && end.urls.every(u => /^https:\/\//.test(u));
+    const why = end ? `${end.type} ${end.why || ''} ${end.found}/${end.total}` : 'no answer';
+    // A check page instead of the chapter is Cloudflare's doing, not a site change.
+    if (end && end.why === 'check') dataChallenged = true;
+    checkData('Every page image found by scrolling the reader', ok, why, 'downloads');
+    checkData('Series title and cover found for downloads', end && end.series && /^https:\/\//.test(end.cover || ''), end ? JSON.stringify({ series: end.series, cover: (end.cover || '').slice(0, 60) }) : '', 'downloads (series name, cover)');
+    if (ok) {
+      const res = await fetch(end.urls[0], { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14)' } }).catch(e => ({ ok: false, status: String(e) }));
+      check('Page images download without cookies or a referrer', res.ok && /^image\//.test(res.headers.get('content-type') || ''), String(res.status), 'downloads');
+    }
+    await dctx.close();
   }
 
   // --- Other routes ---------------------------------------------------------------------------

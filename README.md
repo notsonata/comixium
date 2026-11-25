@@ -35,7 +35,7 @@
 - **The reader you already know**, with app extras on top: tap zones, volume keys, full screen, movable controls.
 - **No ads**, with nothing to set up.
 
-Pick Mihon instead if you want one library across many sites, chapters downloaded for offline reading, or a library that doesn't need an account. Comixium needs a connection and reads from comix only.
+Pick Mihon instead if you want one library across many sites, or a library that doesn't need an account. Comixium reads from comix only, and needs a connection for everything except downloaded chapters.
 
 ## Features
 
@@ -66,6 +66,13 @@ Pick Mihon instead if you want one library across many sites, chapters downloade
 - Every page is drawn by comix itself, so it looks and works like the site
 - App colours follow the theme picked in the site's settings
 - Mobile optimizations tidy up the spots where the site still acts like a desktop page
+
+**Downloads**
+
+- Download chapters from the button on each chapter row of a series page, or from the reader's controls
+- Read them in More → Downloads with no connection: a long strip with pinch zoom, the page you stopped on, and the next downloaded chapter one tap away
+- Downloading doesn't count as reading: reading progress and history on comix stay as they were
+- Download states show on the chapter rows: waiting, progress, done, failed
 
 **Handy extras**
 
@@ -105,6 +112,12 @@ Google blocks its sign-in inside apps that display web pages, so the button is h
 </details>
 
 <details>
+<summary><b>How do downloads work?</b></summary>
+<br>
+Tap the download button next to a chapter on a series page, or in the reader's controls. The app opens the chapter out of sight to find its pages (keep Comixium open for that part, usually a few seconds), then saves the images. Downloaded chapters live in More → Downloads and open without a connection. They're stored inside the app, so uninstalling removes them; delete them per chapter, per series or all at once in Downloads. Opening a chapter to download it doesn't mark it read on comix.
+</details>
+
+<details>
 <summary><b>comix.ws is down. Does the app still work?</b></summary>
 <br>
 Yes. It retries on comix.to automatically for the rest of the session. The two domains keep separate logins, so you may need to log in again there. The domain can also be switched by hand in More → App settings.
@@ -125,7 +138,7 @@ While reading, the gear in the reader controls opens every reader option in one 
 <details>
 <summary><b>Does the app collect any data?</b></summary>
 <br>
-No. There is no analytics or tracking of its own. It only talks to comix.ws / comix.to and the image servers they use, plus any site opened from a tapped link, and it blocks known trackers.
+No. There is no analytics or tracking of its own. It only talks to comix.ws / comix.to and the image servers they use, plus any site opened from a tapped link, and it blocks known trackers. Downloaded chapters stay on the phone.
 </details>
 
 ## What's new

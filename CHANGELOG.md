@@ -2,6 +2,18 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.9.0
+
+Downloads:
+
+- Download chapters for offline reading: a button on each chapter row of a series page, and one in the reader's controls (it can be hidden like the others)
+- More → Downloads lists them by series, with what's still downloading, sizes, and delete per chapter, per series or all
+- The offline reader shows a long strip with pinch zoom, remembers the page, and links to the previous and next downloaded chapter
+- Chapter rows show each download's state: waiting, progress, done, failed
+- Downloading doesn't count as reading: progress and history on comix stay as they were
+- With no connection, the error screen links to downloaded chapters
+- Keep the app open while a chapter is prepared (usually a few seconds); unfinished downloads resume the next time the app opens
+
 ## 1.8.0
 
 Crash reports:
