@@ -18,7 +18,14 @@ object GoogleSignInStarter {
     }
 
     /** [startHost]: the comix domain the user tapped the button on. [userAgent]: the WebView's. */
-    fun run(startHost: String, userAgent: String): Result {
+    fun run(startHost: String, userAgent: String): Result = try {
+        start(startHost, userAgent)
+    } catch (e: Exception) {
+        // Never let this take the app down: the caller falls back to loading comix's start page itself.
+        Result.Failed("${e.javaClass.simpleName}: ${e.message}")
+    }
+
+    private fun start(startHost: String, userAgent: String): Result {
         var host = startHost
         repeat(2) {
             val (code, location) = request(GoogleSignIn.startUrl(host), userAgent) ?: return Result.Failed("no response from $host")

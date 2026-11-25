@@ -13,6 +13,10 @@ Google sign-in:
 - If the browser keeps the sign-in and shows "Invalid OAuth state", share that page to Comixium to finish
 - Share any comix link to Comixium to open it in the app
 
+Crash reports:
+
+- If Comixium closes unexpectedly, the next launch shows what went wrong, to copy or share; the report stays on your phone unless you share it
+
 ## 1.7.1
 
 Reader settings:

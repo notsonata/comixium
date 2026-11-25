@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.SystemClock
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -115,9 +116,13 @@ class WebEngine(private val app: Application) {
      * if that didn't work, so the tab can fall back to loading comix's start page itself.
      */
     fun beginGoogleSignIn(host: String, userAgent: String, onFailed: () -> Unit) {
+        if (googleStarting) return // a second tap while the first is still on its way
+        googleStarting = true
         Thread {
             val result = GoogleSignInStarter.run(host, userAgent)
             mainHandler.post {
+                googleStarting = false
+                if (result is GoogleSignInStarter.Result.Failed) Log.w("Comixium", "Google sign-in start: ${result.why}")
                 when (result) {
                     is GoogleSignInStarter.Result.Ready -> startGoogleSignIn(result.authorizeUrl, result.returnHost)
                     is GoogleSignInStarter.Result.Failed -> onFailed()
@@ -126,6 +131,7 @@ class WebEngine(private val app: Application) {
         }.start()
     }
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var googleStarting = false
 
     /** The browser picker's choice. */
     fun openGoogleIn(url: String, packageName: String) {

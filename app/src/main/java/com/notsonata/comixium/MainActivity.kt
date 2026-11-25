@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.notsonata.comixium.ui.CrashReportDialog
 import com.notsonata.comixium.ui.ImageSheet
 import android.content.pm.verify.domain.DomainVerificationManager
 import android.content.pm.verify.domain.DomainVerificationUserState
@@ -40,6 +41,8 @@ class MainActivity : ComponentActivity(), ActivityServices {
     private val engine get() = (application as ComixiumApplication).engine
 
     private var imageMenu by mutableStateOf<Pair<String, String>?>(null)
+    /** The last crash's report, offered once on the next launch (see [CrashLog]). */
+    private var crashReport by mutableStateOf<String?>(null)
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private val fileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res.resultCode, res.data))
@@ -66,7 +69,8 @@ class MainActivity : ComponentActivity(), ActivityServices {
         val url = when (intent?.action) {
             Intent.ACTION_VIEW -> intent.dataString
             // A shared link (e.g. "Share" on the browser's page): the first comix URL in the text.
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
+            // Some browsers share styled text rather than a plain string, so read it as CharSequence.
+            Intent.ACTION_SEND -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.let { text ->
                 Site.firstSiteUrl(text)
                     ?: run { Toast.makeText(this, "That isn't a comix link", Toast.LENGTH_SHORT).show(); null }
             }
@@ -88,7 +92,10 @@ class MainActivity : ComponentActivity(), ActivityServices {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         engine.services = this
-        if (savedInstanceState == null) handleIntent(intent)
+        if (savedInstanceState == null) {
+            crashReport = CrashLog.pending(this)
+            handleIntent(intent)
+        }
         setContent {
             val colors = engine.colors
             LaunchedEffect(colors.isLight) {
@@ -103,6 +110,12 @@ class MainActivity : ComponentActivity(), ActivityServices {
                 ComixiumApp(engine)
                 imageMenu?.let { (url, title) ->
                     ImageSheet(url, title, userAgent = engine.activeTab?.webView?.settings?.userAgentString) { imageMenu = null }
+                }
+                crashReport?.let { report ->
+                    CrashReportDialog(report) {
+                        crashReport = null
+                        CrashLog.clear(this)
+                    }
                 }
             }
         }
