@@ -498,7 +498,7 @@ private fun GoogleReturnDialog(onSettings: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-/** Shown only when the phone has no default browser: picks where Google sign-in opens. Browsers only. */
+/** Picks the browser Google sign-in opens in: browsers only, the default first. */
 @Composable
 private fun BrowserPickerDialog(choice: BrowserChoice, onPick: (BrowserApp) -> Unit, onCancel: () -> Unit) {
     val c = LocalComixColors.current
@@ -516,10 +516,12 @@ private fun BrowserPickerDialog(choice: BrowserChoice, onPick: (BrowserApp) -> U
                         if (icon != null) Image(icon, null, Modifier.size(32.dp)) else Spacer(Modifier.size(32.dp))
                         Spacer(Modifier.width(14.dp))
                         Text(app.label, color = c.textEmphasis)
+                        if (app.isDefault) {
+                            Spacer(Modifier.width(8.dp))
+                            Text("Default", color = c.text3, fontSize = 12.sp)
+                        }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Text("Set a default browser in Android's settings to skip this.", color = c.text3, fontSize = 12.sp)
             }
         },
         confirmButton = {},

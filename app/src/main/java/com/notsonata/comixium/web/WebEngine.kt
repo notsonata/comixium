@@ -118,14 +118,22 @@ class WebEngine(private val app: Application) {
     fun beginGoogleSignIn(host: String, userAgent: String, onFailed: () -> Unit) {
         if (googleStarting) return // a second tap while the first is still on its way
         googleStarting = true
+        // The WebView's cookie jar is only touched here, on the main thread; the thread does the request.
+        val cookies = android.webkit.CookieManager.getInstance()
+        val headers = Site.DOMAINS.associateWith { runCatching { cookies.getCookie(GoogleSignIn.startUrl(it)) }.getOrNull() }
         Thread {
-            val result = GoogleSignInStarter.run(host, userAgent)
+            val result = GoogleSignInStarter.run(host, userAgent) { headers[it] }
             mainHandler.post {
                 googleStarting = false
-                if (result is GoogleSignInStarter.Result.Failed) Log.w("Comixium", "Google sign-in start: ${result.why}")
                 when (result) {
-                    is GoogleSignInStarter.Result.Ready -> startGoogleSignIn(result.authorizeUrl, result.returnHost)
-                    is GoogleSignInStarter.Result.Failed -> onFailed()
+                    is GoogleSignInStarter.Result.Ready -> {
+                        result.setCookies.forEach { (url, value) -> runCatching { cookies.setCookie(url, value) } }
+                        startGoogleSignIn(result.authorizeUrl, result.returnHost)
+                    }
+                    is GoogleSignInStarter.Result.Failed -> {
+                        Log.w("Comixium", "Google sign-in start: ${result.why}")
+                        onFailed()
+                    }
                 }
             }
         }.start()

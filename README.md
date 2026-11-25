@@ -100,7 +100,7 @@ No. Comixium is an unofficial app. All content comes from comix.ws, shown by the
 <details>
 <summary><b>How does Google sign-in work?</b></summary>
 <br>
-Google blocks its sign-in inside apps that display web pages, so Comixium opens Google's page in your default browser. After you pick your account, Google sends you back to comix.to, and Android hands that link to Comixium, which finishes signing you in.
+Google blocks its sign-in inside apps that display web pages, so Comixium opens Google's page in a browser you pick (your default is listed first). After you pick your account, Google sends you back to comix.to, and Android hands that link to Comixium, which finishes signing you in.
 
 On Android 12 and up, Comixium can only receive that link once you allow it: the first time, the app shows a button to the right settings screen (Open by default → turn on Open supported links → Add link → comix.to). Google sign-in only works on comix.to, so the app switches to comix.to when you use it. Email and password work on either domain.
 

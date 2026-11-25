@@ -92,10 +92,9 @@ class MainActivity : ComponentActivity(), ActivityServices {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         engine.services = this
-        if (savedInstanceState == null) {
-            crashReport = CrashLog.pending(this)
-            handleIntent(intent)
-        }
+        // Also after a restore: a crash while another app was in front brings the app back that way.
+        crashReport = CrashLog.pending(this)
+        if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val colors = engine.colors
             LaunchedEffect(colors.isLight) {
@@ -159,13 +158,15 @@ class MainActivity : ComponentActivity(), ActivityServices {
         return if (ok) LinkAccess.ALLOWED else LinkAccess.DOMAIN_NOT_ADDED
     }
 
+    /** Lets the user pick the browser (the default first), or opens the only one. */
     override fun openInBrowser(url: String) {
-        val browsers = installedBrowsers()
-        val default = defaultBrowser()?.takeIf { pkg -> browsers.any { it.packageName == pkg } }
-        when {
-            default != null -> openInBrowserApp(url, default)
-            browsers.size == 1 -> openInBrowserApp(url, browsers[0].packageName)
-            browsers.isEmpty() -> Toast.makeText(this, "No browser found to sign in with Google", Toast.LENGTH_LONG).show()
+        val default = runCatching { defaultBrowser() }.getOrNull()
+        val browsers = runCatching { installedBrowsers() }.getOrDefault(emptyList())
+            .map { if (it.packageName == default) BrowserApp(it.packageName, it.label, it.icon, isDefault = true) else it }
+            .sortedByDescending { it.isDefault }
+        when (browsers.size) {
+            0 -> Toast.makeText(this, "No browser found to sign in with Google", Toast.LENGTH_LONG).show()
+            1 -> openInBrowserApp(url, browsers[0].packageName)
             else -> engine.browserChoice = BrowserChoice(url, browsers)
         }
     }
@@ -174,7 +175,7 @@ class MainActivity : ComponentActivity(), ActivityServices {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE).setPackage(packageName)
         try {
             startActivity(intent)
-        } catch (e: ActivityNotFoundException) {
+        } catch (e: Exception) { // not only "not found": a browser can refuse to be started this way
             Toast.makeText(this, "Couldn't open the browser", Toast.LENGTH_LONG).show()
         }
     }

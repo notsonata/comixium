@@ -16,7 +16,7 @@ enum class LinkAccess {
 }
 
 /** A browser app the user can pick for Google sign-in. */
-class BrowserApp(val packageName: String, val label: String, val icon: Drawable?)
+class BrowserApp(val packageName: String, val label: String, val icon: Drawable?, val isDefault: Boolean = false)
 
 /** Google's sign-in page waiting for the user to pick one of [apps]. */
 class BrowserChoice(val url: String, val apps: List<BrowserApp>)

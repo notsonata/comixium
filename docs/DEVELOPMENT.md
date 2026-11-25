@@ -45,7 +45,7 @@ Google refuses OAuth inside WebViews, so the flow is split (see `web/GoogleSignI
 1. The site's button opens `/api/v1/auth/google/redirect`. comix sets its sign-in cookie and
    redirects to Google with a `redirect_uri` on a comix domain (currently always comix.to).
 2. If that started on another domain, the tab restarts it on the return domain, so the cookie and
-   the return match. Google's page then goes to the default browser.
+   the return match. Google's page then goes to a browser the user picks (browsers only, the default first).
 3. Google sends the browser to `https://comix.to/api/v1/auth/google/callback?...`. Android hands
    the link to the app (on Android 12+ only once the user allows comix.to under Open by default;
    the app checks first and links to the setting). The app switches to that domain and loads the

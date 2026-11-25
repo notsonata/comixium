@@ -9,13 +9,14 @@ Google sign-in:
 - Continue with Google is back: Google's sign-in opens in your default browser and returns you to the app signed in
 - On Android 12 and up, allow Comixium to open comix.to links once; the app shows the way to the setting
 - Google sign-in lives on comix.to, so the app switches to comix.to when you use it
-- Google sign-in only opens in a browser; with no default browser set, pick one from a list of browsers
+- Google sign-in only opens in a browser: pick one from your installed browsers, your default listed first
 - If the browser keeps the sign-in and shows "Invalid OAuth state", share that page to Comixium to finish
 - Share any comix link to Comixium to open it in the app
 
 Crash reports:
 
 - If Comixium closes unexpectedly, the next launch shows what went wrong, to copy or share; the report stays on your phone unless you share it
+- On Android 11 and up, this includes crashes inside the page engine and the app freezing
 
 ## 1.7.1
 
