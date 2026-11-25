@@ -154,6 +154,12 @@ private fun AppContent(engine: WebEngine) {
         engine.googleCallbackUrl = null
         engine.cancelGoogleSignIn()
         engine.dismissGoogleReturnHint()
+        val hasState = android.webkit.CookieManager.getInstance().getCookie(url)?.contains("session=") == true
+        Toast.makeText(
+            context,
+            if (hasState) "Finishing Google sign-in…" else "Finishing Google sign-in… (the app has no sign-in cookie, so comix may refuse it; try Continue with Google again)",
+            Toast.LENGTH_LONG,
+        ).show()
         searchOpen = false
         val host = Site.hostOf(url)?.removePrefix("www.")
         if (host != null && host != engine.domain && host in Site.DOMAINS) {
@@ -408,12 +414,14 @@ private fun AppContent(engine: WebEngine) {
     }
 
     engine.googleLinkHost?.let { host ->
+        androidx.compose.runtime.CompositionLocalProvider(LocalLinkDetails provides engine.services?.linkDetails()) {
         GoogleLinkDialog(
             host, engine.googleLinkAccess,
             onSettings = { engine.services?.openLinkSettings() },
             onContinue = engine::continueGoogleSignIn,
             onCancel = engine::cancelGoogleSignIn,
         )
+        }
     }
 
     if (searchOpen) {
@@ -434,6 +442,9 @@ private fun AppContent(engine: WebEngine) {
     }
 }
 
+/** What Android reports about the app's links, shown small in the links dialog for troubleshooting. */
+private val LocalLinkDetails = androidx.compose.runtime.staticCompositionLocalOf<String?> { null }
+
 /** Google sign-in comes back through a comix link; on Android 12+ the app may open those only once allowed. */
 @Composable
 private fun GoogleLinkDialog(host: String, access: LinkAccess, onSettings: () -> Unit, onContinue: () -> Unit, onCancel: () -> Unit) {
@@ -448,7 +459,8 @@ private fun GoogleLinkDialog(host: String, access: LinkAccess, onSettings: () ->
         text = {
             Text(
                 "Google sign-in opens in your browser, then sends you back to $host. To come back signed in, " +
-                    "Comixium needs to open $host links.\n\n$missing\n\nIf it's already set, tap Continue anyway.",
+                    "Comixium needs to open $host links.\n\n$missing\n\nIf it's already set, tap Continue anyway.\n\n" +
+                    (LocalLinkDetails.current ?: ""),
             )
         },
         confirmButton = {

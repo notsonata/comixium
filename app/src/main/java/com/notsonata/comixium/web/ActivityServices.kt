@@ -41,6 +41,9 @@ interface ActivityServices {
     /** Opens [url] in the browser app [packageName]. */
     fun openInBrowserApp(url: String, packageName: String)
 
+    /** What Android reports for the app's links, in a line ("supported links on · comix.to: added ..."). */
+    fun linkDetails(): String
+
     /** The system screen where the user lets this app open its links ("Open by default"). */
     fun openLinkSettings()
 }

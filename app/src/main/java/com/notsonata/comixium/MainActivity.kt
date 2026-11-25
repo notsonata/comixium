@@ -194,6 +194,21 @@ class MainActivity : ComponentActivity(), ActivityServices {
         return info?.activityInfo?.packageName?.takeIf { it != "android" && it != packageName }
     }
 
+    override fun linkDetails(): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return "Android ${Build.VERSION.RELEASE}: links open with a chooser"
+        val state = runCatching {
+            getSystemService(DomainVerificationManager::class.java)?.getDomainVerificationUserState(packageName)
+        }.getOrNull() ?: return "Android didn't report link settings"
+        val hosts = state.hostToStateMap.entries.sortedBy { it.key }.joinToString(" · ") { (h, s) ->
+            h + ": " + when (s) {
+                DomainVerificationUserState.DOMAIN_STATE_SELECTED -> "added"
+                DomainVerificationUserState.DOMAIN_STATE_VERIFIED -> "verified"
+                else -> "not added"
+            }
+        }
+        return "Open supported links: ${if (state.isLinkHandlingAllowed) "on" else "off"} · $hosts"
+    }
+
     override fun openLinkSettings() {
         val pkg = Uri.parse("package:$packageName")
         val links = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, pkg) else null

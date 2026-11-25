@@ -339,8 +339,14 @@ class WebTab(
     /** Google sign-in runs in the browser (see [GoogleSignIn]); returns true if this navigation was handled. */
     private fun googleSignInStep(url: String): Boolean {
         if (GoogleSignIn.isStart(url)) {
-            googleStartedOn = Site.hostOf(url)
-            return false
+            val host = Site.hostOf(url) ?: return false
+            engine.beginGoogleSignIn(host, webView.settings.userAgentString) {
+                // An app-started load isn't seen by shouldOverrideUrlLoading, but its redirect to Google is.
+                googleStartedOn = host
+                googleRestarted = false
+                loadUrl(url)
+            }
+            return true
         }
         return when (val step = GoogleSignIn.step(url, googleStartedOn, googleRestarted)) {
             GoogleSignIn.Step.Pass -> false

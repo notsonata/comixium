@@ -109,6 +109,24 @@ class WebEngine(private val app: Application) {
         googleReturnHint = false
     }
 
+    /**
+     * The site's Google button was tapped on [host]: start the sign-in with a direct request (see
+     * [GoogleSignInStarter]) and send Google's page to the browser. [onFailed] runs on the main thread
+     * if that didn't work, so the tab can fall back to loading comix's start page itself.
+     */
+    fun beginGoogleSignIn(host: String, userAgent: String, onFailed: () -> Unit) {
+        Thread {
+            val result = GoogleSignInStarter.run(host, userAgent)
+            mainHandler.post {
+                when (result) {
+                    is GoogleSignInStarter.Result.Ready -> startGoogleSignIn(result.authorizeUrl, result.returnHost)
+                    is GoogleSignInStarter.Result.Failed -> onFailed()
+                }
+            }
+        }.start()
+    }
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     /** The browser picker's choice. */
     fun openGoogleIn(url: String, packageName: String) {
         browserChoice = null
