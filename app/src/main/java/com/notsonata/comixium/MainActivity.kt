@@ -23,6 +23,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.notsonata.comixium.ui.ComixiumApp
+import com.notsonata.comixium.ui.CrashReportDialog
 import com.notsonata.comixium.ui.theme.ComixiumTheme
 
 class MainActivity : ComponentActivity(), ActivityServices {
@@ -30,6 +31,8 @@ class MainActivity : ComponentActivity(), ActivityServices {
     private val engine get() = (application as ComixiumApplication).engine
 
     private var imageMenu by mutableStateOf<Pair<String, String>?>(null)
+    /** The last crash's report, offered once on the next launch (see [CrashLog]). */
+    private var crashReport by mutableStateOf<String?>(null)
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private val fileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res.resultCode, res.data))
@@ -67,6 +70,8 @@ class MainActivity : ComponentActivity(), ActivityServices {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         engine.services = this
+        // Also after a restore: a crash while another app was in front brings the app back that way.
+        crashReport = CrashLog.pending(this)
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val colors = engine.colors
@@ -82,6 +87,12 @@ class MainActivity : ComponentActivity(), ActivityServices {
                 ComixiumApp(engine)
                 imageMenu?.let { (url, title) ->
                     ImageSheet(url, title, userAgent = engine.activeTab?.webView?.settings?.userAgentString) { imageMenu = null }
+                }
+                crashReport?.let { report ->
+                    CrashReportDialog(report) {
+                        crashReport = null
+                        CrashLog.clear(this)
+                    }
                 }
             }
         }

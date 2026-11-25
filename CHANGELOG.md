@@ -2,6 +2,13 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
+## 1.8.0
+
+Crash reports:
+
+- If Comixium closes unexpectedly, the next launch shows what went wrong, to copy or share; the report stays on your phone unless you share it
+- On Android 11 and up, this includes crashes inside the page engine and the app freezing
+
 ## 1.7.1
 
 Reader settings:

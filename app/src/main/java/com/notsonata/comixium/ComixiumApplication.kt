@@ -9,6 +9,7 @@ class ComixiumApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         engine = WebEngine(this)
     }
 }
