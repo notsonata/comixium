@@ -137,14 +137,15 @@ try {
   section = 'Google sign-in';
   {
     await page.evaluate(() => window.__comixium.openLogin());
-    await until(() => page.$('.auth__socials button'));
+    const button = await until(() => page.$('.auth__socials button'));
     let start = null;
     const pattern = '**/api/v1/auth/google/redirect*';
     await page.route(pattern, r => { start = r.request().url(); return r.abort('aborted'); }); // never actually signs in
     await page.evaluate(() => document.querySelector('.auth__socials button')?.click());
     await until(async () => start, 5000);
     await page.unroute(pattern);
-    check('Google button starts at `/api/v1/auth/google/redirect`', start && new URL(start).pathname.replace(/\/$/, '') === '/api/v1/auth/google/redirect', start || 'no navigation', 'Google sign-in in the browser');
+    // The button's navigation depends on the page working normally, so a challenged runner skips it.
+    checkData('Google button starts at `/api/v1/auth/google/redirect`', start && new URL(start).pathname.replace(/\/$/, '') === '/api/v1/auth/google/redirect', start || (button ? 'no navigation' : 'no Google button in the log in dialog'), 'Google sign-in in the browser');
     const res = await page.request.get(BASE + '/api/v1/auth/google/redirect', { maxRedirects: 0 }).catch(() => null);
     if (res && [403, 503].includes(res.status()) && /cloudflare/i.test(res.headers().server || '')) dataChallenged = true;
     let back = '';
