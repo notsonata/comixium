@@ -153,6 +153,7 @@ private fun AppContent(engine: WebEngine) {
         val url = engine.googleCallbackUrl ?: return@LaunchedEffect
         engine.googleCallbackUrl = null
         engine.cancelGoogleSignIn()
+        engine.dismissGoogleReturnHint()
         searchOpen = false
         val host = Site.hostOf(url)?.removePrefix("www.")
         if (host != null && host != engine.domain && host in Site.DOMAINS) {
@@ -394,8 +395,15 @@ private fun AppContent(engine: WebEngine) {
     engine.browserChoice?.let { choice ->
         BrowserPickerDialog(
             choice,
-            onPick = { app -> engine.browserChoice = null; engine.services?.openInBrowserApp(choice.url, app.packageName) },
+            onPick = { app -> engine.openGoogleIn(choice.url, app.packageName) },
             onCancel = { engine.browserChoice = null },
+        )
+    }
+
+    if (engine.googleReturnHint) {
+        GoogleReturnDialog(
+            onSettings = { engine.dismissGoogleReturnHint(); engine.services?.openLinkSettings() },
+            onDismiss = engine::dismissGoogleReturnHint,
         )
     }
 
@@ -450,6 +458,28 @@ private fun GoogleLinkDialog(host: String, access: LinkAccess, onSettings: () ->
             }
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = c.text2) } },
+        containerColor = c.surface,
+        titleContentColor = c.textEmphasis,
+        textContentColor = c.text2,
+    )
+}
+
+/** Back from the browser without Google's return link: how to finish, and how to avoid it next time. */
+@Composable
+private fun GoogleReturnDialog(onSettings: () -> Unit, onDismiss: () -> Unit) {
+    val c = LocalComixColors.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Finish Google sign-in") },
+        text = {
+            Text(
+                "If your browser shows \"Invalid OAuth state\", it kept the sign-in instead of handing it to Comixium. " +
+                    "Go back to that page and tap Share → Comixium (in Chrome, ⋮ → Open in Comixium also works) within a few minutes.\n\n" +
+                    "To skip this next time, let Comixium open comix.to links: Open by default → Open supported links → Add link → comix.to.",
+            )
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = c.accent) } },
+        dismissButton = { TextButton(onClick = onSettings) { Text("Link settings", color = c.text2) } },
         containerColor = c.surface,
         titleContentColor = c.textEmphasis,
         textContentColor = c.text2,

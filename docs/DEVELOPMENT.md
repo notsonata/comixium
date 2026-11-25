@@ -51,6 +51,11 @@ Google refuses OAuth inside WebViews, so the flow is split (see `web/GoogleSignI
    the app checks first and links to the setting). The app switches to that domain and loads the
    link in the Home tab, whose cookie jar has step 1's cookie, so comix signs the app in.
 
+If the browser keeps the callback (no handoff), comix rejects it there with "Invalid OAuth state"
+because the browser lacks step 1's cookie. comix checks the state before exchanging the code, so
+the code is still unused: sharing that page to the app (ACTION_SEND) or Chrome's "Open in Comixium"
+finishes the sign-in. The app shows how when the user comes back from the browser without it.
+
 The daily site check covers the button, its start URL and the `redirect_uri`.
 
 ## Signing

@@ -50,6 +50,10 @@ object Site {
         return norm(a) == norm(b)
     }
 
+    /** The first comix link in shared text ("Title https://comix.to/..." from a browser's Share). */
+    fun firstSiteUrl(text: String): String? =
+        Regex("https://\\S+").findAll(text).map { it.value.trimEnd('.', ',', ')', '"', '\'') }.firstOrNull { isSiteUrl(it) }
+
     /** Path only, without query or fragment. */
     fun pathOnly(url: String?): String {
         val m = url?.let { URL_PARTS.find(it.trim()) } ?: return "/"

@@ -25,6 +25,14 @@ class GoogleSignInTest {
         assertFalse(GoogleSignIn.isGoogleAuthorize("https://accounts.google.com.evil.com/o/oauth2/v2/auth"))
     }
 
+    @Test fun sharedTextGivesTheFirstComixLink() {
+        val back = "https://comix.to/api/v1/auth/google/callback?code=4/0Ab&state=bd4e"
+        assertEquals(back, Site.firstSiteUrl("comix.to $back"))
+        assertEquals(back, Site.firstSiteUrl("See https://example.com/x and $back."))
+        assertTrue(GoogleSignIn.isCallback(Site.firstSiteUrl(back)))
+        assertNull(Site.firstSiteUrl("no links here https://evil.com/api/v1/auth/google/callback"))
+    }
+
     @Test fun returnHostComesFromRedirectUri() {
         assertEquals("comix.to", GoogleSignIn.returnHost(authorize))
         // Only a comix domain, over https, on the callback path counts.

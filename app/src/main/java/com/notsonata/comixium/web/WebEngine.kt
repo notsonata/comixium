@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -90,6 +91,31 @@ class WebEngine(private val app: Application) {
     /** Google's return link, handed over by the browser, waiting for the UI to finish it in a tab. */
     var googleCallbackUrl by mutableStateOf<String?>(null)
 
+    /** When Google's page was sent to the browser (elapsed ms), until its return link comes back. */
+    private var googleOpenedAt = 0L
+
+    /** Shown when the user comes back from the browser without the return link (see the dialog). */
+    var googleReturnHint by mutableStateOf(false)
+        private set
+
+    fun onGoogleCallback(url: String) {
+        googleOpenedAt = 0L
+        googleReturnHint = false
+        googleCallbackUrl = url
+    }
+
+    fun dismissGoogleReturnHint() {
+        googleOpenedAt = 0L
+        googleReturnHint = false
+    }
+
+    /** The browser picker's choice. */
+    fun openGoogleIn(url: String, packageName: String) {
+        browserChoice = null
+        googleOpenedAt = SystemClock.elapsedRealtime()
+        services?.openInBrowserApp(url, packageName)
+    }
+
     /** Set while Google sign-in waits for the user to let the app open [this] domain's links. */
     var googleLinkHost by mutableStateOf<String?>(null)
         private set
@@ -107,6 +133,7 @@ class WebEngine(private val app: Application) {
         val access = if (force) LinkAccess.ALLOWED else s.linkAccess(returnHost)
         if (access == LinkAccess.ALLOWED) {
             cancelGoogleSignIn()
+            googleOpenedAt = SystemClock.elapsedRealtime()
             s.openInBrowser(authorizeUrl)
         } else {
             pendingGoogleUrl = authorizeUrl
@@ -132,9 +159,16 @@ class WebEngine(private val app: Application) {
 
     /** Back in the app (e.g. from the link settings): carry on if links are now allowed, else say what's still missing. */
     fun onActivityResumed() {
-        val host = googleLinkHost ?: return
-        val url = pendingGoogleUrl ?: return
-        startGoogleSignIn(url, host)
+        val host = googleLinkHost
+        val url = pendingGoogleUrl
+        if (host != null && url != null) {
+            startGoogleSignIn(url, host)
+            return
+        }
+        // Back from the browser without Google's return link (a link coming in arrives before this).
+        if (googleOpenedAt > 0 && googleCallbackUrl == null && SystemClock.elapsedRealtime() - googleOpenedAt > 4000) {
+            googleReturnHint = true
+        }
     }
 
     private val tabs = linkedMapOf<String, WebTab>()

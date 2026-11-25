@@ -63,9 +63,17 @@ class MainActivity : ComponentActivity(), ActivityServices {
     }
 
     private fun handleIntent(intent: Intent?) {
-        val url = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString ?: return
+        val url = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.dataString
+            // A shared link (e.g. "Share" on the browser's page): the first comix URL in the text.
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
+                Site.firstSiteUrl(text)
+                    ?: run { Toast.makeText(this, "That isn't a comix link", Toast.LENGTH_SHORT).show(); null }
+            }
+            else -> null
+        } ?: return
         when {
-            GoogleSignIn.isCallback(url) -> engine.googleCallbackUrl = url
+            GoogleSignIn.isCallback(url) -> engine.onGoogleCallback(url)
             Site.isSiteUrl(url) -> engine.deepLinkPath = Site.pathOf(url)
         }
     }

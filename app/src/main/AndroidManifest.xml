@@ -44,6 +44,12 @@
                 <data android:host="comix.to" />
                 <data android:host="www.comix.to" />
             </intent-filter>
+            <!-- Share a comix link to the app, e.g. Google sign-in's return page when the browser kept it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <provider
