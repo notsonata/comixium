@@ -93,18 +93,33 @@ class WebEngine(private val app: Application) {
     /** Set while Google sign-in waits for the user to let the app open [this] domain's links. */
     var googleLinkHost by mutableStateOf<String?>(null)
         private set
+    /** What Android reported for [googleLinkHost], shown in the dialog so the user knows what's missing. */
+    var googleLinkAccess by mutableStateOf(LinkAccess.ALLOWED)
+        private set
     private var pendingGoogleUrl: String? = null
 
-    /** Sends Google's sign-in page to the browser, once the app can receive the return link. */
-    fun startGoogleSignIn(authorizeUrl: String, returnHost: String) {
+    /**
+     * Sends Google's sign-in page to the browser, once the app can receive the return link.
+     * [force] skips the check (the user says it's set; some phones report it differently).
+     */
+    fun startGoogleSignIn(authorizeUrl: String, returnHost: String, force: Boolean = false) {
         val s = services ?: return
-        if (s.canOpenLinks(returnHost)) {
+        val access = if (force) LinkAccess.ALLOWED else s.linkAccess(returnHost)
+        if (access == LinkAccess.ALLOWED) {
             cancelGoogleSignIn()
             s.openInBrowser(authorizeUrl)
         } else {
             pendingGoogleUrl = authorizeUrl
+            googleLinkAccess = access
             googleLinkHost = returnHost
         }
+    }
+
+    /** The dialog's "Continue anyway". */
+    fun continueGoogleSignIn() {
+        val host = googleLinkHost ?: return
+        val url = pendingGoogleUrl ?: return
+        startGoogleSignIn(url, host, force = true)
     }
 
     fun cancelGoogleSignIn() {
@@ -112,11 +127,11 @@ class WebEngine(private val app: Application) {
         googleLinkHost = null
     }
 
-    /** Back in the app (e.g. from the link settings): carry on with Google sign-in if links are now allowed. */
+    /** Back in the app (e.g. from the link settings): carry on if links are now allowed, else say what's still missing. */
     fun onActivityResumed() {
         val host = googleLinkHost ?: return
         val url = pendingGoogleUrl ?: return
-        if (services?.canOpenLinks(host) == true) startGoogleSignIn(url, host)
+        startGoogleSignIn(url, host)
     }
 
     private val tabs = linkedMapOf<String, WebTab>()

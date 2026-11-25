@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,6 +56,7 @@ import android.app.Activity
 import android.view.WindowManager
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.web.AuthState
+import com.notsonata.comixium.web.LinkAccess
 import com.notsonata.comixium.web.Downloads
 import com.notsonata.comixium.web.Site
 import com.notsonata.comixium.web.WebEngine
@@ -377,7 +379,12 @@ private fun AppContent(engine: WebEngine) {
     }
 
     engine.googleLinkHost?.let { host ->
-        GoogleLinkDialog(host, onSettings = { engine.services?.openLinkSettings() }, onCancel = engine::cancelGoogleSignIn)
+        GoogleLinkDialog(
+            host, engine.googleLinkAccess,
+            onSettings = { engine.services?.openLinkSettings() },
+            onContinue = engine::continueGoogleSignIn,
+            onCancel = engine::cancelGoogleSignIn,
+        )
     }
 
     if (searchOpen) {
@@ -400,19 +407,27 @@ private fun AppContent(engine: WebEngine) {
 
 /** Google sign-in comes back through a comix link; on Android 12+ the app may open those only once allowed. */
 @Composable
-private fun GoogleLinkDialog(host: String, onSettings: () -> Unit, onCancel: () -> Unit) {
+private fun GoogleLinkDialog(host: String, access: LinkAccess, onSettings: () -> Unit, onContinue: () -> Unit, onCancel: () -> Unit) {
     val c = LocalComixColors.current
+    val missing = when (access) {
+        LinkAccess.SWITCHED_OFF -> "Android says Open supported links is off for Comixium. Turn it on, then tap Add link and tick $host."
+        else -> "Android says Open supported links is on, but $host isn't ticked yet. Tap Add link (or the list of links) and tick $host."
+    }
     AlertDialog(
         onDismissRequest = onCancel,
         title = { Text("Allow $host links") },
         text = {
             Text(
                 "Google sign-in opens in your browser, then sends you back to $host. To come back signed in, " +
-                    "Comixium needs to open $host links.\n\nIn the next screen, turn on Open supported links, " +
-                    "tap Add link and tick $host. You only need to do this once.",
+                    "Comixium needs to open $host links.\n\n$missing\n\nIf it's already set, tap Continue anyway.",
             )
         },
-        confirmButton = { TextButton(onClick = onSettings) { Text("Open settings", color = c.accent) } },
+        confirmButton = {
+            Row {
+                TextButton(onClick = onContinue) { Text("Continue anyway", color = c.text2) }
+                TextButton(onClick = onSettings) { Text("Open settings", color = c.accent) }
+            }
+        },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = c.text2) } },
         containerColor = c.surface,
         titleContentColor = c.textEmphasis,

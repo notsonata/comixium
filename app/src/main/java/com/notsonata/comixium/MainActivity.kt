@@ -19,6 +19,7 @@ import android.provider.Settings
 import android.widget.Toast
 import com.notsonata.comixium.web.ActivityServices
 import com.notsonata.comixium.web.GoogleSignIn
+import com.notsonata.comixium.web.LinkAccess
 import com.notsonata.comixium.web.Site
 import android.view.KeyEvent
 import android.webkit.CookieManager
@@ -121,15 +122,17 @@ class MainActivity : ComponentActivity(), ActivityServices {
         engine.onActivityResumed()
     }
 
-    override fun canOpenLinks(host: String): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true // asks with a chooser instead
-        val state = getSystemService(DomainVerificationManager::class.java)
-            ?.getDomainVerificationUserState(packageName) ?: return true
-        if (!state.isLinkHandlingAllowed) return false
-        return when (state.hostToStateMap[host]) {
-            DomainVerificationUserState.DOMAIN_STATE_SELECTED, DomainVerificationUserState.DOMAIN_STATE_VERIFIED -> true
-            else -> false
+    override fun linkAccess(host: String): LinkAccess {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return LinkAccess.ALLOWED // asks with a chooser instead
+        val state = runCatching {
+            getSystemService(DomainVerificationManager::class.java)?.getDomainVerificationUserState(packageName)
+        }.getOrNull() ?: return LinkAccess.ALLOWED
+        if (!state.isLinkHandlingAllowed) return LinkAccess.SWITCHED_OFF
+        val wanted = setOf(host, "www.$host", host.removePrefix("www."))
+        val ok = state.hostToStateMap.any { (h, s) ->
+            h in wanted && (s == DomainVerificationUserState.DOMAIN_STATE_SELECTED || s == DomainVerificationUserState.DOMAIN_STATE_VERIFIED)
         }
+        return if (ok) LinkAccess.ALLOWED else LinkAccess.DOMAIN_NOT_ADDED
     }
 
     override fun openInBrowser(url: String) {
