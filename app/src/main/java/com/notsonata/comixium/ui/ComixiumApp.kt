@@ -19,6 +19,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
+import com.notsonata.comixium.web.BrowserApp
+import com.notsonata.comixium.web.BrowserChoice
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -378,6 +391,14 @@ private fun AppContent(engine: WebEngine) {
         }
     }
 
+    engine.browserChoice?.let { choice ->
+        BrowserPickerDialog(
+            choice,
+            onPick = { app -> engine.browserChoice = null; engine.services?.openInBrowserApp(choice.url, app.packageName) },
+            onCancel = { engine.browserChoice = null },
+        )
+    }
+
     engine.googleLinkHost?.let { host ->
         GoogleLinkDialog(
             host, engine.googleLinkAccess,
@@ -428,6 +449,38 @@ private fun GoogleLinkDialog(host: String, access: LinkAccess, onSettings: () ->
                 TextButton(onClick = onSettings) { Text("Open settings", color = c.accent) }
             }
         },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = c.text2) } },
+        containerColor = c.surface,
+        titleContentColor = c.textEmphasis,
+        textContentColor = c.text2,
+    )
+}
+
+/** Shown only when the phone has no default browser: picks where Google sign-in opens. Browsers only. */
+@Composable
+private fun BrowserPickerDialog(choice: BrowserChoice, onPick: (BrowserApp) -> Unit, onCancel: () -> Unit) {
+    val c = LocalComixColors.current
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Sign in with Google in") },
+        text = {
+            Column {
+                choice.apps.forEach { app ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onPick(app) }.padding(vertical = 10.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val icon = remember(app.packageName) { app.icon?.let { runCatching { it.toBitmap(96, 96).asImageBitmap() }.getOrNull() } }
+                        if (icon != null) Image(icon, null, Modifier.size(32.dp)) else Spacer(Modifier.size(32.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Text(app.label, color = c.textEmphasis)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Set a default browser in Android's settings to skip this.", color = c.text3, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {},
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = c.text2) } },
         containerColor = c.surface,
         titleContentColor = c.textEmphasis,

@@ -17,7 +17,10 @@ import android.content.pm.verify.domain.DomainVerificationUserState
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import android.content.pm.PackageManager
 import com.notsonata.comixium.web.ActivityServices
+import com.notsonata.comixium.web.BrowserApp
+import com.notsonata.comixium.web.BrowserChoice
 import com.notsonata.comixium.web.GoogleSignIn
 import com.notsonata.comixium.web.LinkAccess
 import com.notsonata.comixium.web.Site
@@ -136,18 +139,51 @@ class MainActivity : ComponentActivity(), ActivityServices {
     }
 
     override fun openInBrowser(url: String) {
-        val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
-        // The selector picks the default browser app, so no other app claims the link.
-        val browser = Intent(view).apply { selector = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER) }
-        try {
-            startActivity(browser)
-        } catch (e: ActivityNotFoundException) {
-            try {
-                startActivity(view)
-            } catch (e: ActivityNotFoundException) {
-                Toast.makeText(this, "No browser found to sign in with Google", Toast.LENGTH_LONG).show()
-            }
+        val browsers = installedBrowsers()
+        val default = defaultBrowser()?.takeIf { pkg -> browsers.any { it.packageName == pkg } }
+        when {
+            default != null -> openInBrowserApp(url, default)
+            browsers.size == 1 -> openInBrowserApp(url, browsers[0].packageName)
+            browsers.isEmpty() -> Toast.makeText(this, "No browser found to sign in with Google", Toast.LENGTH_LONG).show()
+            else -> engine.browserChoice = BrowserChoice(url, browsers)
         }
+    }
+
+    override fun openInBrowserApp(url: String, packageName: String) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE).setPackage(packageName)
+        try {
+            startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, "Couldn't open the browser", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Any web address, to find apps that open every link: browsers, not apps that claim certain sites. */
+    private val anyWebPage = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")).addCategory(Intent.CATEGORY_BROWSABLE)
+
+    private fun installedBrowsers(): List<BrowserApp> {
+        val pm = packageManager
+        val found = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.queryIntentActivities(anyWebPage, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong()))
+        } else {
+            @Suppress("DEPRECATION") pm.queryIntentActivities(anyWebPage, PackageManager.MATCH_ALL)
+        }
+        return found.map { it.activityInfo.packageName to it }
+            .filter { (pkg, _) -> pkg != packageName }
+            .distinctBy { it.first }
+            .map { (pkg, info) -> BrowserApp(pkg, info.loadLabel(pm).toString(), runCatching { info.loadIcon(pm) }.getOrNull()) }
+            .sortedBy { it.label.lowercase() }
+    }
+
+    /** The default browser's package, or null if the user hasn't picked one (Android would ask). */
+    private fun defaultBrowser(): String? {
+        val pm = packageManager
+        val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.resolveActivity(anyWebPage, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+        } else {
+            @Suppress("DEPRECATION") pm.resolveActivity(anyWebPage, PackageManager.MATCH_DEFAULT_ONLY)
+        }
+        return info?.activityInfo?.packageName?.takeIf { it != "android" && it != packageName }
     }
 
     override fun openLinkSettings() {

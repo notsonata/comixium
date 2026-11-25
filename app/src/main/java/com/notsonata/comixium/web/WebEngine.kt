@@ -115,6 +115,9 @@ class WebEngine(private val app: Application) {
         }
     }
 
+    /** Browsers to pick from when the phone has no default browser (never other apps). */
+    var browserChoice by mutableStateOf<BrowserChoice?>(null)
+
     /** The dialog's "Continue anyway". */
     fun continueGoogleSignIn() {
         val host = googleLinkHost ?: return
