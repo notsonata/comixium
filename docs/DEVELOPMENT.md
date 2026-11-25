@@ -99,6 +99,12 @@ version: tag `v1.3.0`, title "Comixium 1.3.0", asset `comixium-1.3.0.apk`.
   Earlier releases are re-synced from the same file. CI fails if the current version has no
   section.
 - **Same version:** a merge that doesn't bump the version rebuilds that version's release.
+- **Pre-releases:** a version goes out as a pre-release until it's listed in
+  [`.github/tested-versions`](../.github/tested-versions), which happens only after that build
+  has been tested on a phone. "Latest" (the README's download link) is always the newest listed
+  version. Promoting a version is a one-line change to that file; the next merge to `main`
+  updates the release. Bump the version for every change to the app, so a tested version never
+  picks up untested code.
 
 To ship a new version, bump `appVersion` and add a `## x.y.z` section to the changelog.
 Changelog style: short headed bullet lists, no first person.

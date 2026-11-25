@@ -1,0 +1,12 @@
+# Versions tested on a phone and confirmed good. CI publishes a version as a full (latest) release
+# only if it's listed here; any other version goes out as a pre-release. Add a version only after
+# that build has been tested. Versions up to 1.7.1 predate this rule and were released as full releases.
+1.0.0
+1.1.0
+1.2.0
+1.3.0
+1.4.0
+1.5.0
+1.6.0
+1.7.0
+1.7.1
