@@ -208,20 +208,23 @@ class MainActivity : ComponentActivity(), ActivityServices {
         return info?.activityInfo?.packageName?.takeIf { it != "android" && it != packageName }
     }
 
-    override fun linkDetails(): String {
+    override fun linkDetails(): String = runCatching {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return "Android ${Build.VERSION.RELEASE}: links open with a chooser"
-        val state = runCatching {
-            getSystemService(DomainVerificationManager::class.java)?.getDomainVerificationUserState(packageName)
-        }.getOrNull() ?: return "Android didn't report link settings"
-        val hosts = state.hostToStateMap.entries.sortedBy { it.key }.joinToString(" · ") { (h, s) ->
+        val state = getSystemService(DomainVerificationManager::class.java)?.getDomainVerificationUserState(packageName)
+            ?: return "Android didn't report link settings"
+        // hostToStateMap is an ArrayMap whose entry set can't be copied to an array (sorting it
+        // directly crashes), so walk it into a plain list first.
+        val hosts = mutableListOf<Pair<String, Int>>()
+        for ((h, s) in state.hostToStateMap) hosts += h to s
+        val list = hosts.sortedBy { it.first }.joinToString(" · ") { (h, s) ->
             h + ": " + when (s) {
                 DomainVerificationUserState.DOMAIN_STATE_SELECTED -> "added"
                 DomainVerificationUserState.DOMAIN_STATE_VERIFIED -> "verified"
                 else -> "not added"
             }
         }
-        return "Open supported links: ${if (state.isLinkHandlingAllowed) "on" else "off"} · $hosts"
-    }
+        "Open supported links: ${if (state.isLinkHandlingAllowed) "on" else "off"} · $list"
+    }.getOrElse { "Android didn't report link settings" }
 
     override fun openLinkSettings() {
         val pkg = Uri.parse("package:$packageName")
