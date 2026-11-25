@@ -12,7 +12,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.notsonata.comixium.ui.ImageSheet
+import android.content.pm.verify.domain.DomainVerificationManager
+import android.content.pm.verify.domain.DomainVerificationUserState
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
 import com.notsonata.comixium.web.ActivityServices
+import com.notsonata.comixium.web.GoogleSignIn
 import com.notsonata.comixium.web.Site
 import android.view.KeyEvent
 import android.webkit.CookieManager
@@ -54,7 +60,10 @@ class MainActivity : ComponentActivity(), ActivityServices {
 
     private fun handleIntent(intent: Intent?) {
         val url = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString ?: return
-        if (Site.isSiteUrl(url)) engine.deepLinkPath = Site.pathOf(url)
+        when {
+            GoogleSignIn.isCallback(url) -> engine.googleCallbackUrl = url
+            Site.isSiteUrl(url) -> engine.deepLinkPath = Site.pathOf(url)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -109,6 +118,43 @@ class MainActivity : ComponentActivity(), ActivityServices {
     override fun onResume() {
         super.onResume()
         engine.createdTabs.forEach { it.onResume() }
+        engine.onActivityResumed()
+    }
+
+    override fun canOpenLinks(host: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true // asks with a chooser instead
+        val state = getSystemService(DomainVerificationManager::class.java)
+            ?.getDomainVerificationUserState(packageName) ?: return true
+        if (!state.isLinkHandlingAllowed) return false
+        return when (state.hostToStateMap[host]) {
+            DomainVerificationUserState.DOMAIN_STATE_SELECTED, DomainVerificationUserState.DOMAIN_STATE_VERIFIED -> true
+            else -> false
+        }
+    }
+
+    override fun openInBrowser(url: String) {
+        val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+        // The selector picks the default browser app, so no other app claims the link.
+        val browser = Intent(view).apply { selector = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER) }
+        try {
+            startActivity(browser)
+        } catch (e: ActivityNotFoundException) {
+            try {
+                startActivity(view)
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, "No browser found to sign in with Google", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    override fun openLinkSettings() {
+        val pkg = Uri.parse("package:$packageName")
+        val links = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, pkg) else null
+        try {
+            startActivity(links ?: Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg))
+        } catch (e: ActivityNotFoundException) {
+            runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)) }
+        }
     }
 
     override fun onPause() {

@@ -51,12 +51,6 @@ a[href*="utm_source=comix"] {
   display: none !important;
 }
 
-/* Google refuses sign-in inside embedded web views, so only offer email/password. */
-.auth__or,
-.auth__socials {
-  display: none !important;
-}
-
 /* The app already shows the reader full screen; the site's fullscreen API button would fight it.
    Its help button lists keyboard shortcuts; the gear's settings sheet covers touch instead. */
 .rpage-floatctl__btn--fs,

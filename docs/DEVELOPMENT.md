@@ -38,6 +38,21 @@ Requirements: JDK 17+ and the Android SDK (`ANDROID_HOME`, or `sdk.dir` in `loca
 The APK lands in `app/build/outputs/apk/release/`. Without the release key it comes out unsigned
 (`app-release-unsigned.apk`); debug builds (`assembleDebug`) use the standard debug key.
 
+## Google sign-in
+
+Google refuses OAuth inside WebViews, so the flow is split (see `web/GoogleSignIn.kt`):
+
+1. The site's button opens `/api/v1/auth/google/redirect`. comix sets its sign-in cookie and
+   redirects to Google with a `redirect_uri` on a comix domain (currently always comix.to).
+2. If that started on another domain, the tab restarts it on the return domain, so the cookie and
+   the return match. Google's page then goes to the default browser.
+3. Google sends the browser to `https://comix.to/api/v1/auth/google/callback?...`. Android hands
+   the link to the app (on Android 12+ only once the user allows comix.to under Open by default;
+   the app checks first and links to the setting). The app switches to that domain and loads the
+   link in the Home tab, whose cookie jar has step 1's cookie, so comix signs the app in.
+
+The daily site check covers the button, its start URL and the `redirect_uri`.
+
 ## Signing
 
 The release key is never committed. `app/signing/release-cert.sha256` (public) is the SHA-256 of

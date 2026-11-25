@@ -115,7 +115,7 @@ try {
   section = 'Dialogs';
   await page.evaluate(() => window.__comixium.openLogin()); await wait(800);
   check('Log in dialog opens (`.auth`)', await page.$('.auth'), '', 'native Log in button');
-  check('Google sign-in hidden (`.auth__socials`)', await page.evaluate(() => { const s = document.querySelector('.auth__socials'); return !s || s.offsetParent === null; }), '', 'Google button would show and fail');
+  check('Google button shown (`.auth__socials button`)', await page.evaluate(() => { const b = document.querySelector('.auth__socials button'); return !!b && b.offsetParent !== null; }), '', 'Continue with Google');
   check('Dialog reported as open', (await lastState())?.dialog === true, '', 'Back closes dialogs');
   await page.evaluate(() => window.__comixium.closeDialog()); await wait(600);
   check('Log in dialog closes (`.auth__close`)', !(await page.$('.auth')), '', 'Back closes dialogs');
@@ -132,6 +132,28 @@ try {
   await page.evaluate(() => window.__comixium.closeDialog());
   checkData('Back from Content preferences returns to the main settings', sub && await until(() => page.$('.settings-dialog .settings-advanced-row')), '', 'Back inside Theme & content filter');
   await page.evaluate(() => window.__comixium.closeDialog()); await wait(500);
+
+  // --- Google sign-in: the app sends Google's page to the browser and catches the way back ------
+  section = 'Google sign-in';
+  {
+    await page.evaluate(() => window.__comixium.openLogin());
+    await until(() => page.$('.auth__socials button'));
+    let start = null;
+    const pattern = '**/api/v1/auth/google/redirect*';
+    await page.route(pattern, r => { start = r.request().url(); return r.abort('aborted'); }); // never actually signs in
+    await page.evaluate(() => document.querySelector('.auth__socials button')?.click());
+    await until(async () => start, 5000);
+    await page.unroute(pattern);
+    check('Google button starts at `/api/v1/auth/google/redirect`', start && new URL(start).pathname.replace(/\/$/, '') === '/api/v1/auth/google/redirect', start || 'no navigation', 'Google sign-in in the browser');
+    const res = await page.request.get(BASE + '/api/v1/auth/google/redirect', { maxRedirects: 0 }).catch(() => null);
+    if (res && [403, 503].includes(res.status()) && /cloudflare/i.test(res.headers().server || '')) dataChallenged = true;
+    let back = '';
+    try { back = new URL(res.headers().location).searchParams.get('redirect_uri') || ''; } catch (e) { /* no redirect */ }
+    checkData('Google returns to `https://comix.*/api/v1/auth/google/callback`', /^https:\/\/(www\.)?comix\.(ws|to)\/api\/v1\/auth\/google\/callback\/?$/.test(back), back || `HTTP ${res ? res.status() : 'error'}`, 'Google sign-in coming back to the app (comix links)');
+    if (!/^https:\/\/[^/]+\/?$/.test(page.url())) await open('/'); // back to the home page for the next section
+    else await page.evaluate(() => window.__comixium.closeDialog());
+    await wait(500);
+  }
 
   // --- Series page ----------------------------------------------------------------------------
   section = 'Series page';

@@ -85,6 +85,40 @@ class WebEngine(private val app: Application) {
     /** A comix.ws / comix.to link opened from another app, waiting for the UI to show it. */
     var deepLinkPath by mutableStateOf<String?>(null)
 
+    // --- Google sign-in (see GoogleSignIn) ---------------------------------------------------------
+
+    /** Google's return link, handed over by the browser, waiting for the UI to finish it in a tab. */
+    var googleCallbackUrl by mutableStateOf<String?>(null)
+
+    /** Set while Google sign-in waits for the user to let the app open [this] domain's links. */
+    var googleLinkHost by mutableStateOf<String?>(null)
+        private set
+    private var pendingGoogleUrl: String? = null
+
+    /** Sends Google's sign-in page to the browser, once the app can receive the return link. */
+    fun startGoogleSignIn(authorizeUrl: String, returnHost: String) {
+        val s = services ?: return
+        if (s.canOpenLinks(returnHost)) {
+            cancelGoogleSignIn()
+            s.openInBrowser(authorizeUrl)
+        } else {
+            pendingGoogleUrl = authorizeUrl
+            googleLinkHost = returnHost
+        }
+    }
+
+    fun cancelGoogleSignIn() {
+        pendingGoogleUrl = null
+        googleLinkHost = null
+    }
+
+    /** Back in the app (e.g. from the link settings): carry on with Google sign-in if links are now allowed. */
+    fun onActivityResumed() {
+        val host = googleLinkHost ?: return
+        val url = pendingGoogleUrl ?: return
+        if (services?.canOpenLinks(host) == true) startGoogleSignIn(url, host)
+    }
+
     private val tabs = linkedMapOf<String, WebTab>()
 
     /** Tabs live as long as the process, so switching tabs or recreating the activity keeps pages. */

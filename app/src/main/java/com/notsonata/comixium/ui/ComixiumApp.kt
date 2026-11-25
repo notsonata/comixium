@@ -29,7 +29,10 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -109,15 +112,42 @@ private fun AppContent(engine: WebEngine) {
         keepScreenOn = reader && engine.reader.keepScreenOn,
     )
 
+    /** Set when Google sign-in came back, so every open page shows the account once it's in. */
+    var refreshAfterGoogle by rememberSaveable { mutableStateOf(false) }
+
     // Account pages depend on who is logged in: refresh them when that changes.
     LaunchedEffect(auth) {
         if (auth == AuthState.LOGGED_IN) {
             listOf(AppTab.LIBRARY, AppTab.HISTORY).map(::webTab).filter { it.isCreated }.forEach { t ->
                 t.startPath?.let(t::open)
             }
+            if (refreshAfterGoogle) {
+                refreshAfterGoogle = false
+                val home = webTab(AppTab.HOME)
+                engine.createdTabs.filter { it.isCreated && it !== home && it.startPath !in setOf(AppTab.LIBRARY.startPath, AppTab.HISTORY.startPath) }
+                    .forEach { it.reload() }
+            }
             returnAfterLogin?.let { selected = it }
             returnAfterLogin = null
         }
+    }
+
+    // Google sign-in came back from the browser: finish it in the Home tab, on the domain Google
+    // returned to (comix only accepts it there, and that's where the login then lives).
+    LaunchedEffect(engine.googleCallbackUrl) {
+        val url = engine.googleCallbackUrl ?: return@LaunchedEffect
+        engine.googleCallbackUrl = null
+        engine.cancelGoogleSignIn()
+        searchOpen = false
+        val host = Site.hostOf(url)?.removePrefix("www.")
+        if (host != null && host != engine.domain && host in Site.DOMAINS) {
+            engine.switchDomain(host)
+            Toast.makeText(context, "Google sign-in works on $host, so Comixium now uses $host", Toast.LENGTH_LONG).show()
+        }
+        engine.createdTabs.filter { it.isCreated && it.dialogOpen }.forEach { it.js("window.__comixium && window.__comixium.closeDialog()") }
+        refreshAfterGoogle = true
+        selected = AppTab.HOME
+        webTab(AppTab.HOME).pushUrl(url)
     }
 
     // Links opened from other apps land on top of the Home tab's history.
@@ -346,6 +376,10 @@ private fun AppContent(engine: WebEngine) {
         }
     }
 
+    engine.googleLinkHost?.let { host ->
+        GoogleLinkDialog(host, onSettings = { engine.services?.openLinkSettings() }, onCancel = engine::cancelGoogleSignIn)
+    }
+
     if (searchOpen) {
         Box(Modifier.fillMaxSize().zIndex(3f).background(c.bg)) {
             SearchOverlay(
@@ -362,6 +396,28 @@ private fun AppContent(engine: WebEngine) {
             )
         }
     }
+}
+
+/** Google sign-in comes back through a comix link; on Android 12+ the app may open those only once allowed. */
+@Composable
+private fun GoogleLinkDialog(host: String, onSettings: () -> Unit, onCancel: () -> Unit) {
+    val c = LocalComixColors.current
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Allow $host links") },
+        text = {
+            Text(
+                "Google sign-in opens in your browser, then sends you back to $host. To come back signed in, " +
+                    "Comixium needs to open $host links.\n\nIn the next screen, turn on Open supported links, " +
+                    "tap Add link and tick $host. You only need to do this once.",
+            )
+        },
+        confirmButton = { TextButton(onClick = onSettings) { Text("Open settings", color = c.accent) } },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = c.text2) } },
+        containerColor = c.surface,
+        titleContentColor = c.textEmphasis,
+        textContentColor = c.text2,
+    )
 }
 
 private fun listSaver() = androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.snapshots.SnapshotStateList<AppTab>, String>(

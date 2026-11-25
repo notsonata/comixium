@@ -78,8 +78,13 @@ class WebTab(
     private var clearHistoryOnLoad = false
     /** Path requested before the views existed (e.g. a More-screen link); loaded on attach. */
     private var pendingPath: String? = null
+    /** A full URL requested before the views existed (Google's sign-in return link); loaded on attach. */
+    private var pendingUrl: String? = null
     /** A site helper (openLogin, openSettings...) to run once a page with the site header has loaded. */
     private var pendingAction: String? = null
+    /** Google sign-in in progress in this tab: the domain comix started it on, and whether it was restarted. */
+    private var googleStartedOn: String? = null
+    private var googleRestarted = false
     lateinit var webView: WebView
         private set
     lateinit var container: SwipeRefreshLayout
@@ -95,8 +100,10 @@ class WebTab(
             setOnChildScrollUpCallback { _, _ -> !canPullToRefresh() }
         }
         installWebView()
-        (pendingPath ?: startPath)?.let(::loadPath)
+        val url = pendingUrl
+        if (url != null) loadUrl(url) else (pendingPath ?: startPath)?.let(::loadPath)
         pendingPath = null
+        pendingUrl = null
     }
 
     /** Load [path] now, or as soon as the tab is first shown. Replaces the tab's history. */
@@ -128,6 +135,11 @@ class WebTab(
     fun openWithAction(path: String, action: String) {
         pendingAction = action
         open(path)
+    }
+
+    /** Load a full site URL (keeping its domain), now or once shown. */
+    fun pushUrl(url: String) {
+        if (!created) pendingUrl = url else loadUrl(url)
     }
 
     /** Navigate to [path] on top of the current history (deep links), now or once shown. */
@@ -324,6 +336,29 @@ class WebTab(
         if (last != null) webView.loadUrl(last) else startPath?.let(::loadPath)
     }
 
+    /** Google sign-in runs in the browser (see [GoogleSignIn]); returns true if this navigation was handled. */
+    private fun googleSignInStep(url: String): Boolean {
+        if (GoogleSignIn.isStart(url)) {
+            googleStartedOn = Site.hostOf(url)
+            return false
+        }
+        return when (val step = GoogleSignIn.step(url, googleStartedOn, googleRestarted)) {
+            GoogleSignIn.Step.Pass -> false
+            is GoogleSignIn.Step.Restart -> {
+                // Start again where Google will send the user back, so comix's sign-in cookie is there.
+                googleRestarted = true
+                googleStartedOn = step.host
+                main.post { loadUrl(GoogleSignIn.startUrl(step.host)) }
+                true
+            }
+            is GoogleSignIn.Step.OpenInBrowser -> {
+                googleRestarted = false
+                main.post { engine.startGoogleSignIn(step.url, step.returnHost) }
+                true
+            }
+        }
+    }
+
     private fun openExternal(url: String) {
         val ctx = contextWrapper.baseContext ?: return
         val scheme = CustomTabColorSchemeParams.Builder()
@@ -366,6 +401,7 @@ class WebTab(
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val target = request.url.toString()
+            if (request.isForMainFrame && googleSignInStep(target)) return true
             return when (val action = LinkPolicy.decide(target, request.hasGesture(), request.isForMainFrame, engine.adBlocker)) {
                 LinkAction.Internal -> false
                 is LinkAction.External -> { openExternal(action.url); true }

@@ -70,6 +70,7 @@ Pick Mihon instead if you want one library across many sites, chapters downloade
 **Handy extras**
 
 - Share any series; long-press an image to save or share it
+- Sign in with your comix email and password, or with Google (through your browser)
 - Downloads and library backups work
 - comix links from other apps can open in Comixium (on Android 12 and up, turn on its links under App info → Open by default)
 - Hide the home page announcements and share bar
@@ -78,7 +79,7 @@ Pick Mihon instead if you want one library across many sites, chapters downloade
 
 1. Download `comixium-<version>.apk` from the [latest release](https://github.com/notsonata/comixium/releases/latest).
 2. Open it on your phone and allow installs from your browser or files app when Android asks.
-3. Log in with your comix email and password.
+3. Log in with your comix email and password, or Continue with Google.
 
 **Updating:** install the newer APK over the old one. Login and settings are kept.
 
@@ -97,9 +98,11 @@ No. Comixium is an unofficial app. All content comes from comix.ws, shown by the
 </details>
 
 <details>
-<summary><b>Why can't I sign in with Google?</b></summary>
+<summary><b>How does Google sign-in work?</b></summary>
 <br>
-Google blocks its sign-in inside apps that display web pages, so the button is hidden. Use your comix email and password instead.
+Google blocks its sign-in inside apps that display web pages, so Comixium opens Google's page in your default browser. After you pick your account, Google sends you back to comix.to, and Android hands that link to Comixium, which finishes signing you in.
+
+On Android 12 and up, Comixium can only receive that link once you allow it: the first time, the app shows a button to the right settings screen (Open by default → turn on Open supported links → Add link → comix.to). Google sign-in only works on comix.to, so the app switches to comix.to when you use it. Email and password work on either domain.
 </details>
 
 <details>
