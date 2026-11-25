@@ -101,11 +101,17 @@ jobs:
           # A merge that doesn't bump the version rebuilds that version's release on the new commit.
           gh release delete "v${VERSION}" --yes --cleanup-tag || true
           scripts/release-notes.sh "$VERSION" "$GITHUB_SHA" > notes.md
+          # Untested versions go out as pre-releases, so "latest" stays on the newest tested build.
+          if grep -qxF "$VERSION" .github/tested-versions; then
+            kind=(--latest)
+          else
+            kind=(--prerelease --latest=false)
+          fi
           gh release create "v${VERSION}" "$APK" \
             --target "$GITHUB_SHA" \
             --title "Comixium ${VERSION}" \
             --notes-file notes.md \
-            --latest
+            "${kind[@]}"
 
       - name: Sync notes of earlier releases with CHANGELOG.md
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -117,5 +123,11 @@ jobs:
             [ "$v" = "$VERSION" ] && continue
             sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${v}" --jq .object.sha 2>/dev/null)" || continue
             scripts/release-notes.sh "$v" "$sha" > "notes-${v}.md"
-            gh release edit "v${v}" --notes-file "notes-${v}.md"
+            # Also promotes a version newly listed in .github/tested-versions (or demotes one removed).
+            if grep -qxF "$v" .github/tested-versions; then pre=false; else pre=true; fi
+            gh release edit "v${v}" --notes-file "notes-${v}.md" --prerelease="$pre"
+          done
+          # "Latest" is the newest tested version that has a release.
+          for v in $(grep -x '[0-9][0-9.]*' .github/tested-versions | sort -rV); do
+            if gh release view "v${v}" > /dev/null 2>&1; then gh release edit "v${v}" --latest; break; fi
           done

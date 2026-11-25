@@ -23,4 +23,7 @@ else
   fi
   printf -- '- Signing certificate SHA-256: `%s`\n' "$cert"
 fi
+if ! grep -qxF "$version" "$(dirname "$0")/../.github/tested-versions"; then
+  printf -- '- Pre-release: not tested on a phone yet. The latest release is the newest tested build\n'
+fi
 if [ -n "$sha" ]; then printf -- '- Built from %s\n' "${sha:0:7}"; fi
