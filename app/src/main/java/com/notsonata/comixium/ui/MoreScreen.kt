@@ -56,6 +56,7 @@ fun MoreScreen(
     onSignOut: () -> Unit,
     onSiteSettings: () -> Unit,
     onSettings: () -> Unit,
+    onDownloads: () -> Unit = {},
     scroll: ScrollState = rememberScrollState(),
     version: String = BuildConfig.VERSION_NAME,
 ) {
@@ -74,6 +75,9 @@ fun MoreScreen(
                 LinkRow(Lucide.LogIn, "Log in", subtitle = "Sync your library and reading progress", accent = true, onClick = onLogin)
                 LinkRow(Lucide.UserPlus, "Create an account", onClick = onRegister)
             }
+        }
+        Section("OFFLINE") {
+            LinkRow(Lucide.Download, "Downloads", subtitle = "Chapters saved to read without a connection", onClick = onDownloads)
         }
         SectionLabel("BROWSE", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp))
         BrowseGrid(onOpen)

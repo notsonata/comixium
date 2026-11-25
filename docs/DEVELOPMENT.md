@@ -18,6 +18,31 @@ everything around the pages is native (Kotlin, Jetpack Compose):
   - reports page state (URL, title, login, reader, theme colours) to the app;
   - adds reader touch controls and control layouts;
   - applies the mobile optimizations (`html[data-cx-mobile]`).
+  - adds download buttons to chapter rows and the reader controls (`setDownloads` paints their state).
+
+### Downloads
+
+Chapter images come from the encrypted API, so downloads let the site's own reader find them
+(`app/src/main/java/.../offline`):
+
+1. **Collect** (`PageCollector` + `assets/inject/collect.js`): a WebView placed behind the app's
+   screens loads the chapter. It has to be attached and drawn, just covered: the reader fills in a
+   page's `<img>` only as it scrolls near, which needs frames. The script, injected only there,
+   shows the chapter as a long strip (it overrides the `settings_v2` read without saving it),
+   drops writes to `reader.progress*` and non-GET calls to `/api/v1/user/`, so the visit isn't
+   recorded as reading. Then it scrolls page by page and reports every `.rpage-page img` address,
+   plus the series title and cover from the page's embedded data. Every image request in this
+   WebView gets a 1x1 placeholder, so nothing heavy loads and the reader never retries.
+2. **Fetch** (`PageFetcher`): the images download directly, three at a time. The image hosts
+   need no cookies or referrer.
+3. **Store** (`DownloadStore`): `files/downloads/<series>/<chapter id>/001.webp` and so on, with
+   `chapter.properties` (label, group, page count and sizes, last page read). Chapters left
+   incomplete resume on the next launch.
+4. **Read** (`ui/OfflineReader`, `OfflinePage`): a WebView with `WebViewAssetLoader` serves a
+   generated long-strip page from those files; any other request is refused.
+
+Collecting pauses when the app leaves the screen (no frames), and resumes when it's back. The
+site check runs `collect.js` against a live chapter.
 
 ### Ad blocking
 

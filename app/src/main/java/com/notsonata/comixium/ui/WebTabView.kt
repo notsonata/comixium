@@ -19,6 +19,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -40,7 +41,7 @@ import com.notsonata.comixium.web.WebTab
 
 /** Hosts one tab's WebView, with a thin loading bar and a native error screen on top. */
 @Composable
-fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier, visible: Boolean = true) {
+fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier, visible: Boolean = true, onDownloads: (() -> Unit)? = null) {
     val context = LocalContext.current
     val colors = LocalComixColors.current
     // Hidden tabs stay composed (so their pages and scroll positions survive) but don't draw.
@@ -80,6 +81,7 @@ fun WebTabView(tab: WebTab, engine: WebEngine, modifier: Modifier = Modifier, vi
                 onRetry = tab::reload,
                 otherDomain = Site.DOMAINS.firstOrNull { it != Site.hostOf(err.url) },
                 onTryDomain = { d -> tab.loadUrl(Site.swapDomain(err.url, d)) },
+                onDownloads = onDownloads,
             )
         }
     }
@@ -92,6 +94,7 @@ internal fun ErrorPane(
     onRetry: () -> Unit,
     otherDomain: String?,
     onTryDomain: (String) -> Unit,
+    onDownloads: (() -> Unit)? = null,
 ) {
     val colors = LocalComixColors.current
     val host = Site.hostOf(error.url) ?: "the site"
@@ -131,6 +134,10 @@ internal fun ErrorPane(
                     Text("Try $otherDomain", color = colors.text)
                 }
             }
+        }
+        if (onDownloads != null) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onDownloads) { Text("Read downloaded chapters", color = colors.accent) }
         }
         Spacer(Modifier.height(12.dp))
         Text(

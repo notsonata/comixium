@@ -28,4 +28,10 @@ class PackagedAssetsTest {
         assertTrue(js.contains("__COMIXIUM_CSS__"))
         assertTrue(css.contains(".topnav"))
     }
+
+    @Test fun downloadCollectorScriptExists() {
+        val js = context.assets.open("inject/collect.js").bufferedReader().readText()
+        assertTrue(js.contains("ComixiumCollector"))
+        assertTrue(js.contains(".rpage-page"))
+    }
 }

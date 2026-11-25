@@ -276,6 +276,7 @@ html[data-cx-hide~="home"] .rpage-floatctl [aria-label="Home"],
 html[data-cx-hide~="series"] .rpage-floatctl [aria-label="Manga page"],
 html[data-cx-hide~="comments"] .rpage-floatctl [aria-label="Toggle comments"],
 html[data-cx-hide~="chapters"] .rpage-floatctl__col [aria-label="Chapter list"],
+html[data-cx-hide~="download"] .rpage-floatctl .cx-dl-reader,
 html[data-cx-hide~="autoscroll"] .rpage-floatctl [aria-label*="auto-scroll"] {
   display: none !important;
 }
@@ -618,3 +619,52 @@ html[data-cx-mobile] .mpage__badges {
   border-top: 1px solid rgb(var(--text-rgb) / 0.08) !important;
   background: var(--bg) !important;
 }
+
+/* Downloads (see chapterRows / readerDownload): a button per chapter row, styled like the row's
+   bookmark, and one among the reader's buttons. The app sets data-state and --cx-p (percent). */
+.mchap-item > .cx-dl {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cx-dl { position: relative; }
+.cx-dl[data-state="done"] { color: var(--accent); }
+.cx-dl[data-state="queued"] svg,
+.cx-dl[data-state="preparing"] svg,
+.cx-dl[data-state="active"] svg { opacity: 0.55; transform: scale(0.8); }
+.cx-dl[data-state="failed"] { color: var(--danger, #e5484d); }
+/* A ring around the icon: progress while downloading, a spinning arc while preparing, dotted while waiting. */
+.cx-dl[data-state="queued"]::after,
+.cx-dl[data-state="preparing"]::after,
+.cx-dl[data-state="active"]::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+}
+.cx-dl[data-state="active"]::after {
+  background: conic-gradient(var(--accent) calc(var(--cx-p, 0) * 1%), color-mix(in srgb, currentColor 25%, transparent) 0);
+}
+.cx-dl[data-state="preparing"]::after {
+  background: conic-gradient(var(--accent) 0 25%, color-mix(in srgb, currentColor 25%, transparent) 0);
+  animation: cx-dl-spin 0.9s linear infinite;
+}
+.cx-dl[data-state="queued"]::after {
+  background: repeating-conic-gradient(color-mix(in srgb, currentColor 45%, transparent) 0 6%, transparent 0 12.5%);
+}
+@keyframes cx-dl-spin { to { transform: rotate(1turn); } }

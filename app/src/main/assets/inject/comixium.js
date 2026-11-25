@@ -277,7 +277,7 @@
   // Which reader control buttons to show (the settings button always stays).
   var CONTROL_ITEMS = [
     ['chapter', 'Chapter switcher'], ['home', 'Home'], ['series', 'Series page'],
-    ['comments', 'Comments'], ['chapters', 'Chapter list'], ['autoscroll', 'Auto-scroll']
+    ['comments', 'Comments'], ['chapters', 'Chapter list'], ['autoscroll', 'Auto-scroll'], ['download', 'Download']
   ];
   var GESTURES_HINT = 'Swipe to turn pages or scroll, pinch to zoom, tap or drag the progress bar to jump, ' +
     'and use Back to leave the chapter. Tap zones and the controls tap work as set above.';
@@ -628,6 +628,83 @@
     }
   }
 
+  // --- Downloads: a button on each chapter row of a series page, and one in the reader ----------
+  // The app owns the downloads; it sends each chapter's state with setDownloads (id -> state).
+  var dlStates = {};
+  var DL_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" ' +
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var DL_DONE_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m6 12.5 4 4 8-9M5 19.5h14" ' +
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var DL_LABELS = {
+    done: 'Downloaded', queued: 'Download waiting', preparing: 'Preparing download', active: 'Downloading',
+    failed: 'Download failed, tap for options'
+  };
+  function chapterIdOf(href) {
+    var m = /\/(\d+)-chapter-[^/?#]+\/?$/.exec(String(href || '').split(/[?#]/)[0]);
+    return m ? m[1] : '';
+  }
+  function paintDownload(btn, id) {
+    var st = dlStates[id] || '';
+    var kind = st.indexOf('active:') === 0 ? 'active' : st;
+    setAttr(btn, 'data-state', kind || null);
+    btn.style.setProperty('--cx-p', kind === 'active' ? st.slice(7) : '0');
+    btn.setAttribute('aria-label', DL_LABELS[kind] || 'Download chapter');
+    var icon = kind === 'done' ? 'done' : 'dl';
+    if (btn.getAttribute('data-icon') !== icon) {
+      btn.setAttribute('data-icon', icon);
+      btn.innerHTML = icon === 'done' ? DL_DONE_SVG : DL_SVG;
+    }
+  }
+  function makeDownloadButton(cls, onTap) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); onTap(); });
+    return b;
+  }
+  function chapterRows() {
+    if (pageKey() !== 'title') return;
+    var rows = document.querySelectorAll('.mchap-item');
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var a = row.querySelector('a.mchap-row__primary[href*="-chapter-"]');
+      if (!a) continue;
+      var btn = row.querySelector(':scope > .cx-dl');
+      if (!btn) {
+        btn = makeDownloadButton('cx-dl', (function (row) {
+          return function () {
+            // Read the row at tap time: the list reuses rows when paging.
+            var link = row.querySelector('a.mchap-row__primary[href*="-chapter-"]');
+            if (!link) return;
+            var ch = row.querySelector('.mchap-row__ch');
+            var group = row.querySelector('.mchap-row__group span');
+            var title = document.querySelector('.mpage__title');
+            var cover = document.querySelector('.mpage__poster img');
+            post({
+              t: 'download', path: link.getAttribute('href'),
+              label: ch ? ch.textContent.trim() : '', group: group ? group.textContent.trim() : '',
+              series: title ? title.textContent.trim() : '', cover: cover ? (cover.currentSrc || cover.src || '') : ''
+            });
+          };
+        })(row));
+        row.insertBefore(btn, row.querySelector(':scope > .mchap-bookmark'));
+      }
+      paintDownload(btn, chapterIdOf(a.getAttribute('href')));
+    }
+  }
+  function readerDownload() {
+    var col = document.body && document.body.classList.contains('rpage-body') && document.querySelector('.rpage-floatctl__col');
+    if (!col) return;
+    var btn = col.querySelector('.cx-dl-reader');
+    if (!btn) {
+      btn = makeDownloadButton('rpage-floatctl__btn cx-dl cx-dl-reader', function () {
+        post({ t: 'download', path: location.pathname, label: '', group: '', series: '', cover: '' });
+      });
+      col.insertBefore(btn, col.querySelector('[aria-label="Settings"]'));
+    }
+    paintDownload(btn, chapterIdOf(location.pathname));
+  }
+
   // --- State reporting ----------------------------------------------------------------------
   var VARS = {
     bg: '--bg', bg2: '--bg-2', surface: '--surface', surface2: '--surface-2', surface3: '--surface-3',
@@ -703,6 +780,8 @@
     homeBlocks();
     readerSettingsSections();
     fitSeriesHeader();
+    chapterRows();
+    readerDownload();
     var s = snapshot();
     var key = JSON.stringify(s);
     if (key !== last) { last = key; post(s); }
@@ -844,6 +923,12 @@
       homeBlocks();
       readerSettingsSections();
       fitSeriesHeader();
+      return true;
+    },
+    setDownloads: function (map) {
+      dlStates = map || {};
+      chapterRows();
+      readerDownload();
       return true;
     },
     scrollByPage: function (dir) {

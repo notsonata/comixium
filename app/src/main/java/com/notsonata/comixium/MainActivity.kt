@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity(), ActivityServices {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         engine.services = this
+        engine.downloads.collector.retarget(this)
         // Also after a restore: a crash while another app was in front brings the app back that way.
         crashReport = CrashLog.pending(this)
         if (savedInstanceState == null) handleIntent(intent)
@@ -128,8 +129,21 @@ class MainActivity : ComponentActivity(), ActivityServices {
         super.onPause()
     }
 
+    override fun onStart() {
+        super.onStart()
+        engine.downloads.setForeground(true)
+    }
+
+    override fun onStop() {
+        engine.downloads.setForeground(false)
+        super.onStop()
+    }
+
     override fun onDestroy() {
-        if (engine.services === this) engine.services = null
+        if (engine.services === this) {
+            engine.services = null
+            engine.downloads.collector.retarget(null)
+        }
         fileCallback?.onReceiveValue(null)
         fileCallback = null
         engine.createdTabs.forEach { it.detach(applicationContext) }

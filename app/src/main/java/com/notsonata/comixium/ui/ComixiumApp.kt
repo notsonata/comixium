@@ -2,6 +2,8 @@ package com.notsonata.comixium.ui
 
 import android.text.format.Formatter
 import android.widget.Toast
+import android.view.ViewGroup
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
@@ -50,6 +52,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.app.Activity
 import android.view.WindowManager
+import com.notsonata.comixium.offline.ChapterLink
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.web.AuthState
 import com.notsonata.comixium.web.Downloads
@@ -70,7 +73,14 @@ private val BACK_EASING = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
 
 @Composable
 fun ComixiumApp(engine: WebEngine) {
-    Box(Modifier.fillMaxSize()) { AppContent(engine) }
+    Box(Modifier.fillMaxSize()) {
+        // The page that prepares chapter downloads (see PageCollector): drawn, but under the app's screens.
+        AndroidView(
+            factory = { engine.downloads.collector.host.also { (it.parent as? ViewGroup)?.removeView(it) } },
+            modifier = Modifier.fillMaxSize(),
+        )
+        AppContent(engine)
+    }
 }
 
 @Composable
@@ -82,6 +92,12 @@ private fun AppContent(engine: WebEngine) {
     var morePageOpen by rememberSaveable { mutableStateOf(false) }
     /** The native Settings page, one level below More (a web page opened from More sits above both). */
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    /** Downloads, one level below More; [downloadsSeries] is the series opened in it. */
+    var downloadsOpen by rememberSaveable { mutableStateOf(false) }
+    var downloadsSeries by rememberSaveable { mutableStateOf<String?>(null) }
+    /** A downloaded chapter open in the offline reader (its path), over everything else. */
+    var offlinePath by rememberSaveable { mutableStateOf<String?>(null) }
+    val offlineLink = offlinePath?.let(ChapterLink::parse)
     val moreScroll = rememberScrollState()
     /** Tab to go back to once a login started from its "log in" prompt succeeds. */
     var returnAfterLogin by rememberSaveable { mutableStateOf<AppTab?>(null) }
@@ -105,8 +121,8 @@ private fun AppContent(engine: WebEngine) {
     val reader = current?.isReader == true
     SideEffect { engine.activeTab = current }
     ReaderWindowEffects(
-        immersive = reader && engine.reader.immersive,
-        keepScreenOn = reader && engine.reader.keepScreenOn,
+        immersive = (reader || offlineLink != null) && engine.reader.immersive,
+        keepScreenOn = (reader || offlineLink != null) && engine.reader.keepScreenOn,
     )
 
     // Account pages depend on who is logged in: refresh them when that changes.
@@ -137,6 +153,8 @@ private fun AppContent(engine: WebEngine) {
                     siteSettingsPage = false
                     morePageOpen = false
                     settingsOpen = false
+                    downloadsOpen = false
+                    downloadsSeries = null
                 }
                 else -> webTab(t).goRoot()
             }
@@ -156,6 +174,17 @@ private fun AppContent(engine: WebEngine) {
         siteSettingsPage = false
         moreTab.open(path)
         morePageOpen = true
+        if (AppTab.MORE !in visited) visited += AppTab.MORE
+        selected = AppTab.MORE
+    }
+
+    fun openDownloads(series: String? = null) {
+        searchOpen = false
+        siteSettingsPage = false
+        morePageOpen = false
+        settingsOpen = false
+        downloadsOpen = true
+        downloadsSeries = series
         if (AppTab.MORE !in visited) visited += AppTab.MORE
         selected = AppTab.MORE
     }
@@ -180,6 +209,7 @@ private fun AppContent(engine: WebEngine) {
     }
 
     fun back(): Boolean {
+        if (offlinePath != null) { offlinePath = null; return true }
         if (searchOpen) { searchOpen = false; return true }
         if (siteSettingsPage && selected == AppTab.MORE && morePageOpen) {
             // A view inside the settings (Content preferences) goes back to the main view first.
@@ -192,12 +222,14 @@ private fun AppContent(engine: WebEngine) {
         if (current?.handleBack() == true) return true
         if (selected == AppTab.MORE && morePageOpen) { morePageOpen = false; return true }
         if (selected == AppTab.MORE && settingsOpen) { settingsOpen = false; return true }
+        if (selected == AppTab.MORE && downloadsSeries != null) { downloadsSeries = null; return true }
+        if (selected == AppTab.MORE && downloadsOpen) { downloadsOpen = false; return true }
         if (selected != AppTab.HOME) { selected = AppTab.HOME; return true }
         return false
     }
 
-    val canHandleBack = searchOpen || current?.canGoBack == true || current?.dialogOpen == true ||
-        (selected == AppTab.MORE && (morePageOpen || settingsOpen)) || selected != AppTab.HOME
+    val canHandleBack = offlinePath != null || searchOpen || current?.canGoBack == true || current?.dialogOpen == true ||
+        (selected == AppTab.MORE && (morePageOpen || settingsOpen || downloadsOpen)) || selected != AppTab.HOME
     // Predictive back (Android 14+): the page follows the finger 1:1 (shrinks a little and slides
     // toward the swipe), then settles on release (speed from settings) or springs back on cancel.
     // With the back animation off there's no preview: Back just changes the page on release.
@@ -208,7 +240,7 @@ private fun AppContent(engine: WebEngine) {
         try {
             // Closing a popup or search isn't a page change: no preview for those.
             val leavesSettingsPage = siteSettingsPage && current === moreTab && moreTab.dialogSubpage.isEmpty()
-            val preview = engine.appPrefs.backAnimation && !searchOpen && (current?.dialogOpen != true || leavesSettingsPage)
+            val preview = engine.appPrefs.backAnimation && !searchOpen && offlinePath == null && (current?.dialogOpen != true || leavesSettingsPage)
             events.collect { e ->
                 backFromLeft = e.swipeEdge == BackEventCompat.EDGE_LEFT
                 if (preview) backAnim.snapTo(BACK_EASING.transform(e.progress))
@@ -222,6 +254,9 @@ private fun AppContent(engine: WebEngine) {
     }
     val animatedBack = backAnim.value
 
+    val downloadsTitle = remember(downloadsSeries) {
+        downloadsSeries?.let { runCatching { engine.downloads.store.seriesTitle(it) }.getOrNull() } ?: "Downloads"
+    }
     val imeVisible = WindowInsets.isImeVisible
     Scaffold(
         containerColor = c.bg,
@@ -233,12 +268,13 @@ private fun AppContent(engine: WebEngine) {
                     siteSettingsPage && selected == AppTab.MORE && morePageOpen ->
                         moreTab.dialogSubpage.ifBlank { "Theme & content filter" }
                     selected == AppTab.MORE && settingsOpen && current == null -> "Settings"
+                    selected == AppTab.MORE && downloadsOpen && current == null -> downloadsTitle
                     current == null -> selected.label
                     else -> current.displayTitle.ifBlank { if (atRoot) selected.label else "" }
                 }
                 ComixTopBar(
                     title = title,
-                    showBack = if (current == null) selected == AppTab.MORE && settingsOpen
+                    showBack = if (current == null) selected == AppTab.MORE && (settingsOpen || downloadsOpen)
                     else current.canGoBack || (selected == AppTab.MORE && morePageOpen),
                     showBrand = selected == AppTab.HOME && current != null && atRoot,
                     auth = auth,
@@ -280,7 +316,7 @@ private fun AppContent(engine: WebEngine) {
         ) {
             visited.filter { it != AppTab.MORE }.forEach { t ->
                 val visible = t == selected && current != null
-                WebTabView(webTab(t), engine, Modifier.fillMaxSize().zIndex(if (visible) 1f else 0f), visible = visible)
+                WebTabView(webTab(t), engine, Modifier.fillMaxSize().zIndex(if (visible) 1f else 0f), visible = visible, onDownloads = { openDownloads() })
             }
             if (AppTab.MORE in visited && (moreTab.isCreated || morePageOpen)) {
                 val visible = selected == AppTab.MORE && morePageOpen
@@ -293,7 +329,14 @@ private fun AppContent(engine: WebEngine) {
                 }
             }
             if (selected == AppTab.MORE && !morePageOpen) Box(Modifier.fillMaxSize().zIndex(2f)) {
-                if (settingsOpen) {
+                if (downloadsOpen) {
+                    DownloadsScreen(
+                        downloads = engine.downloads,
+                        seriesSlug = downloadsSeries,
+                        onSeries = { downloadsSeries = it },
+                        onRead = { offlinePath = it.path },
+                    )
+                } else if (settingsOpen) {
                     var cacheSize by remember { mutableStateOf<String?>(null) }
                     var clearing by remember { mutableStateOf(false) }
                     val scope = rememberCoroutineScope()
@@ -331,6 +374,7 @@ private fun AppContent(engine: WebEngine) {
                         onSignOut = { siteAction("signOut") },
                         onSiteSettings = ::openSiteSettings,
                         onSettings = { settingsOpen = true },
+                        onDownloads = { openDownloads() },
                         scroll = moreScroll,
                     )
                 }
@@ -344,6 +388,21 @@ private fun AppContent(engine: WebEngine) {
                 )
             }
         }
+    }
+
+    offlineLink?.let { link ->
+        Box(Modifier.fillMaxSize().zIndex(4f)) {
+            OfflineReader(engine.downloads, link, onOpen = { offlinePath = it.path }, onClose = { offlinePath = null })
+        }
+    }
+
+    engine.downloadPrompt?.let { link ->
+        DownloadPromptDialog(
+            engine.downloads, link,
+            onRead = { engine.downloadPrompt = null; offlinePath = link.path },
+            onOpenDownloads = { engine.downloadPrompt = null; openDownloads(link.seriesSlug) },
+            onDismiss = { engine.downloadPrompt = null },
+        )
     }
 
     if (searchOpen) {

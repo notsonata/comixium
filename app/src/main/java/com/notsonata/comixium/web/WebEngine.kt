@@ -9,6 +9,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
+import com.notsonata.comixium.offline.ChapterDownloads
+import com.notsonata.comixium.offline.ChapterLink
 import com.notsonata.comixium.ui.theme.ComixColors
 import com.notsonata.comixium.ui.theme.withSiteTheme
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,37 @@ class WebEngine(private val app: Application) {
     val adBlocker = AdBlocker { runCatching { app.assets.open(HOSTS_ASSET) }.getOrNull() }.apply {
         enabled = prefs.getBoolean(KEY_ADBLOCK, true)
         loadAsync()
+    }
+
+    /** Chapters saved for offline reading. */
+    val downloads = ChapterDownloads(app, adBlocker).also {
+        it.onChange = { pushDownloadStates() }
+        it.domain = { domain }
+    }
+
+    /** A downloaded (or downloading) chapter whose button was tapped: the UI offers what to do with it. */
+    var downloadPrompt by mutableStateOf<ChapterLink?>(null)
+
+    /** A page's download button: start the chapter, or ask about one already saved or on its way. */
+    fun onDownloadTap(link: ChapterLink, series: String, label: String, group: String, cover: String) {
+        if (downloads.isDownloaded(link) || downloads.itemFor(link) != null) {
+            downloadPrompt = link
+            return
+        }
+        downloads.enqueue(ChapterDownloads.Request(link, domain, series, label, group, cover))
+    }
+
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    private var downloadPushQueued = false
+
+    /** Sends download states to pages with download buttons; changes are batched (progress is frequent). */
+    fun pushDownloadStates() {
+        if (downloadPushQueued) return
+        downloadPushQueued = true
+        main.postDelayed({
+            downloadPushQueued = false
+            tabs.values.filter { it.isCreated }.forEach { it.pushDownloadStates() }
+        }, 150)
     }
 
     /** Domain new loads go to. Switches to the mirror automatically if the current one is unreachable. */

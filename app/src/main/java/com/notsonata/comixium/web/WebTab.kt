@@ -32,6 +32,7 @@ import androidx.webkit.WebViewClientCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.notsonata.comixium.BuildConfig
+import com.notsonata.comixium.offline.ChapterLink
 import java.io.ByteArrayInputStream
 
 data class WebError(val url: String, val code: Int, val description: String, val isHttp: Boolean = false)
@@ -296,6 +297,12 @@ class WebTab(
             runCatching { org.json.JSONObject(json) }.getOrNull()?.let { engine.onPagePref(it.optString("key"), it.opt("value")) }
             return
         }
+        if (PageState.type(json) == "download") {
+            val o = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return
+            val link = ChapterLink.parse(o.optString("path")) ?: return
+            engine.onDownloadTap(link, o.optString("series"), o.optString("label"), o.optString("group"), o.optString("cover"))
+            return
+        }
         PageDownload.parse(json)?.let { d ->
             contextWrapper.baseContext?.let { Downloads.saveBytes(it, d.name, d.mime, d.bytes) }
             return
@@ -307,11 +314,20 @@ class WebTab(
         dialogSubpage = state.dialogSubpage
         engine.onPageState(state)
         js(engine.pagePrefsCall())
+        pushDownloadStates()
         val action = pendingAction
         if (action != null && state.auth != AuthState.UNKNOWN) {
             pendingAction = null
             js("window.__comixium && window.__comixium.$action()")
         }
+    }
+
+    /** Tells a series or chapter page which of its chapters are downloaded or on their way. */
+    fun pushDownloadStates() {
+        if (!created || !Site.isSiteUrl(url)) return
+        val slug = ChapterLink.seriesSlugOf(Site.pathOnly(url)) ?: return
+        val states = org.json.JSONObject(engine.downloads.pageStates(slug) as Map<*, *>)
+        js("window.__comixium && window.__comixium.setDownloads($states)")
     }
 
     /** Renderer crashed or was killed for memory: swap in a fresh WebView at the same URL. */
