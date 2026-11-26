@@ -2,36 +2,25 @@
 
 Each section becomes the notes of the GitHub release for that version.
 
-## 1.10.0
-
-Downloads:
-
-- Downloaded chapters open in the usual reader, with the same controls, settings and comments, with or without a connection
-- Comments are saved with each chapter (Download comments, on by default)
-- Download many chapters from a series page's Download button: unread (from where you left off), all, or from a chapter number; up to the latest, 5, 10, 25 or any number
-- Pick scanlators in order of preference: each chapter is downloaded once, from the first picked group that has it, so duplicate listings from several groups don't multiply the download
-- Library has a Downloaded section beside the site's library; the offline screen links to it
-- More → Downloads shows what's downloading and the download settings: delete chapters once read to the end, download comments, only on Wi-Fi
-- Pages download in the background while the next chapter is prepared
-- Retry no longer stalls when nothing else is downloading
-- Chapters downloaded with 1.9.0 are updated for the new reader the next time the app is open and online; their images are kept
-- Preparing a chapter no longer changes how the site sees the browser (the site flags pages whose built-in functions are replaced)
-
-Fixes:
-
-- No sideways stretch on any page, including the library
-
 ## 1.9.0
 
 Downloads:
 
-- Download chapters for offline reading: a button on each chapter row of a series page, and one in the reader's controls (it can be hidden like the others)
-- More → Downloads lists them by series, with what's still downloading, sizes, and delete per chapter, per series or all
-- The offline reader shows a long strip with pinch zoom, remembers the page, and links to the previous and next downloaded chapter
+- Download a chapter for offline reading from the button on its row on a series page, or from the reader's controls (the button can be hidden like the others)
+- Download many chapters from a series page's Download button: unread (from where you left off), all, or from a chapter number; up to the latest, 5, 10, 25 or any number
+- Pick scanlators in order of preference: each chapter is downloaded once, from the first picked group that has it, so duplicate listings from several groups don't multiply the download
+- Downloaded chapters open in the usual reader, with the same controls, settings and comments, with or without a connection
+- Comments are saved with each chapter (Download comments, on by default)
+- Library has a Downloaded section beside the site's library: downloads by series, with sizes and delete per chapter, per series or all; the offline screen links to it
+- More → Downloads shows what's downloading and the download settings: delete chapters once read to the end, download comments, only on Wi-Fi
 - Chapter rows show each download's state: waiting, progress, done, failed
 - Downloading doesn't count as reading: progress and history on comix stay as they were
-- With no connection, the error screen links to downloaded chapters
-- Keep the app open while a chapter is prepared (usually a few seconds); unfinished downloads resume the next time the app opens
+- Keep the app open while chapters are prepared (a few seconds each); pages keep downloading in the background, and unfinished downloads resume the next time the app opens
+- Chapters downloaded with the first 1.9.0 build are updated for the new reader the next time the app is open and online; their images are kept
+
+Fixes:
+
+- No sideways stretch on any page, including the library
 
 ## 1.8.0
 
