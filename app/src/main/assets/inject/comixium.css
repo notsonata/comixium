@@ -202,10 +202,24 @@ a[href*="utm_source=comix"] {
   opacity: 1;
 }
 
-/* No sideways stretch when a swipe hits the edge of the page (vertical bounce stays). */
+/* No sideways stretch when a swipe hits the edge of the page (vertical bounce stays). Android
+   stretches sideways only when a page is wider than the screen, so anything that pokes out to the
+   side is clipped (clip, unlike hidden, keeps sticky headers working); no element passes a sideways
+   overscroll on either. Reader pages keep their own layout (paged modes move sideways). */
 html,
-body {
+body,
+* {
   overscroll-behavior-x: none !important;
+}
+body:not(.rpage-body) > #app-root,
+body:not(.rpage-body) > #toast-root {
+  overflow-x: clip !important;
+}
+
+/* The series page's group filter, opened out of sight to read the group names for downloads. */
+html[data-cx-peek] .mpage__group .fdrop__pop {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* --- Reader controls: layout, position and size ------------------------------------------ */

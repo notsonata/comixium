@@ -33,9 +33,16 @@ data class ChapterLink(val seriesSlug: String, val chapterId: String, val number
  *     <root>/<series slug>/cover               cover image, if it could be fetched
  *     <root>/<series slug>/<chapter id>/chapter.properties
  *     <root>/<series slug>/<chapter id>/001.webp, 002.webp, ...
+ *     <root>/<series slug>/<chapter id>/page.html        the chapter page as the site sent it
+ *     <root>/<series slug>/<chapter id>/images.txt       each page's image address (path), in order
+ *     <root>/<series slug>/<chapter id>/responses.properties + response-N   the site's API answers
+ *     <root>/<series slug>/<chapter id>/assets.txt       the scripts, styles and fonts the page used
+ *     <root>/_assets/<sha1 of address> + .meta           those files, shared by every chapter
+ *     <root>/_walks/<id>.properties                      series downloads still in progress
  *
- * Plain files and [Properties], so it works (and is tested) without Android. Not thread-safe:
- * the download queue writes from one place at a time.
+ * With the page, its files and its answers on disk, the site's own reader runs offline (see
+ * [OfflineServer]). Plain files and [Properties], so it works (and is tested) without Android.
+ * Not thread-safe: the download queue writes from one place at a time.
  */
 class DownloadStore(val root: File) {
 
@@ -52,11 +59,26 @@ class DownloadStore(val root: File) {
         val complete: Boolean = false,
         val bytes: Long = 0,
         val savedAt: Long = 0,
-        /** Page sizes in pixels (width x height), so the offline reader can lay out before images load. */
-        val sizes: List<Pair<Int, Int>> = emptyList(),
-        /** Last page read offline (1-based), 0 if never opened. */
-        val lastPage: Int = 0,
+        /** The page, its files and its answers were saved too, so the site's reader can open it offline. */
+        val recorded: Boolean = false,
+        /** Number of the chapter after this one, as the reader's Next button says ("" at the end or unknown). */
+        val next: String = "",
+        /** Read to the end at least once since it was downloaded. */
+        val read: Boolean = false,
     )
+
+    /** One of the site's API answers, saved with what the page needs to read it. */
+    data class Response(val url: String, val type: String, val enc: String, val body: ByteArray) {
+        override fun equals(other: Any?): Boolean =
+            other is Response && url == other.url && type == other.type && enc == other.enc && body.contentEquals(other.body)
+        override fun hashCode(): Int = url.hashCode()
+    }
+
+    /** A saved answer on disk. */
+    data class SavedResponse(val url: String, val type: String, val enc: String, val file: File)
+
+    /** A script, style or font a chapter page uses, shared by all chapters. */
+    data class Asset(val url: String, val type: String, val file: File)
 
     fun seriesDir(slug: String): File = File(root, safe(slug))
     fun chapterDir(link: ChapterLink): File = File(seriesDir(link.seriesSlug), safe(link.chapterId))
@@ -101,10 +123,97 @@ class DownloadStore(val root: File) {
             setProperty("complete", ch.complete.toString())
             setProperty("bytes", ch.bytes.toString())
             setProperty("savedAt", ch.savedAt.toString())
-            setProperty("sizes", ch.sizes.joinToString(",") { (w, h) -> "${w}x$h" })
-            setProperty("lastPage", ch.lastPage.toString())
+            setProperty("recorded", ch.recorded.toString())
+            setProperty("next", ch.next)
+            setProperty("read", ch.read.toString())
         }
         writeProps(File(dir, CHAPTER_FILE), p)
+    }
+
+    // --- The chapter page, for the site's reader offline ------------------------------------
+
+    /**
+     * Saves what the site's reader needs besides the images: the page, the API answers (the
+     * chapter, and its comments if wanted) and which page image each address is.
+     */
+    fun writeRecording(link: ChapterLink, html: String, responses: List<Response>, images: List<String>, assets: List<String>) {
+        val dir = chapterDir(link).apply { mkdirs() }
+        (dir.listFiles() ?: emptyArray()).filter { it.name.startsWith(RESPONSE_PREFIX) }.forEach { it.delete() }
+        val p = Properties()
+        responses.forEachIndexed { i, r ->
+            writeAtomically(File(dir, "$RESPONSE_PREFIX$i")) { it.writeBytes(r.body) }
+            p.setProperty("$i.url", r.url)
+            p.setProperty("$i.type", r.type)
+            p.setProperty("$i.enc", r.enc)
+        }
+        p.setProperty("count", responses.size.toString())
+        writeProps(File(dir, RESPONSES_FILE), p)
+        writeAtomically(File(dir, IMAGES_FILE)) { it.writeText(images.joinToString("\n"), Charsets.UTF_8) }
+        writeAtomically(File(dir, ASSETS_FILE)) { it.writeText(assets.joinToString("\n"), Charsets.UTF_8) }
+        writeAtomically(File(dir, PAGE_HTML)) { it.writeText(html, Charsets.UTF_8) }
+    }
+
+    fun pageHtml(link: ChapterLink): File? = File(chapterDir(link), PAGE_HTML).takeIf { it.isFile }
+
+    fun responses(link: ChapterLink): List<SavedResponse> {
+        val dir = chapterDir(link)
+        val p = readProps(File(dir, RESPONSES_FILE))
+        val n = p.getProperty("count")?.toIntOrNull() ?: 0
+        return (0 until n).mapNotNull { i ->
+            val f = File(dir, "$RESPONSE_PREFIX$i").takeIf { it.isFile } ?: return@mapNotNull null
+            SavedResponse(p.getProperty("$i.url") ?: return@mapNotNull null, p.getProperty("$i.type").orEmpty(), p.getProperty("$i.enc").orEmpty(), f)
+        }
+    }
+
+    /** The image address (path) of each page, in page order. */
+    fun images(link: ChapterLink): List<String> = lines(File(chapterDir(link), IMAGES_FILE))
+
+    /** The shared files (scripts, styles, fonts) this chapter's page uses. */
+    fun chapterAssets(link: ChapterLink): List<String> = lines(File(chapterDir(link), ASSETS_FILE))
+
+    private val assetsDir: File get() = File(root, ASSETS_DIR)
+
+    fun hasAsset(url: String): Boolean = File(assetsDir, sha1(url)).isFile
+
+    fun writeAsset(url: String, type: String, bytes: ByteArray) {
+        val dir = assetsDir.apply { mkdirs() }
+        val name = sha1(url)
+        writeAtomically(File(dir, name)) { it.writeBytes(bytes) }
+        writeProps(File(dir, "$name.meta"), Properties().apply { setProperty("url", url); setProperty("type", type) })
+    }
+
+    fun assets(): List<Asset> =
+        (assetsDir.listFiles() ?: emptyArray()).filter { it.name.endsWith(".meta") }.mapNotNull { meta ->
+            val body = File(meta.parentFile, meta.name.removeSuffix(".meta")).takeIf { it.isFile } ?: return@mapNotNull null
+            val p = readProps(meta)
+            Asset(p.getProperty("url") ?: return@mapNotNull null, p.getProperty("type").orEmpty(), body)
+        }
+
+    /** Deletes shared files no downloaded chapter uses any more. */
+    fun pruneAssets() {
+        val used = allChapters().flatMap { chapterAssets(it.link) }.map(::sha1).toSet()
+        (assetsDir.listFiles() ?: emptyArray()).forEach { f ->
+            if (f.name.removeSuffix(".meta").removeSuffix(".part") !in used) f.delete()
+        }
+    }
+
+    // --- Series downloads in progress (see SeriesWalk) ---------------------------------------
+
+    private val walksDir: File get() = File(root, WALKS_DIR)
+
+    fun writeWalk(id: String, values: Map<String, String>) {
+        val dir = walksDir.apply { mkdirs() }
+        writeProps(File(dir, safe(id) + ".properties"), Properties().apply { values.forEach { (k, v) -> setProperty(k, v) } })
+    }
+
+    fun walks(): List<Map<String, String>> =
+        (walksDir.listFiles() ?: emptyArray()).filter { it.name.endsWith(".properties") }.sortedBy { it.name }.map { f ->
+            val p = readProps(f)
+            p.stringPropertyNames().associateWith { p.getProperty(it) }
+        }
+
+    fun deleteWalk(id: String) {
+        File(walksDir, safe(id) + ".properties").delete()
     }
 
     /** The page files present, in page order (complete files only, not ones still downloading). */
@@ -151,15 +260,27 @@ class DownloadStore(val root: File) {
             complete = p.getProperty("complete") == "true",
             bytes = p.getProperty("bytes")?.toLongOrNull() ?: 0,
             savedAt = p.getProperty("savedAt")?.toLongOrNull() ?: 0,
-            sizes = parseSizes(p.getProperty("sizes").orEmpty()),
-            lastPage = p.getProperty("lastPage")?.toIntOrNull() ?: 0,
+            recorded = p.getProperty("recorded") == "true" && File(file.parentFile, PAGE_HTML).isFile,
+            next = p.getProperty("next").orEmpty(),
+            read = p.getProperty("read") == "true",
         )
     }
+
+    private fun lines(file: File): List<String> =
+        if (!file.isFile) emptyList() else file.readText(Charsets.UTF_8).split('\n').map { it.trim() }.filter { it.isNotEmpty() }
 
     companion object {
         private const val SERIES_FILE = "series.properties"
         private const val CHAPTER_FILE = "chapter.properties"
         private const val COVER_FILE = "cover"
+        private const val PAGE_HTML = "page.html"
+        private const val IMAGES_FILE = "images.txt"
+        private const val ASSETS_FILE = "assets.txt"
+        private const val RESPONSES_FILE = "responses.properties"
+        private const val RESPONSE_PREFIX = "response-"
+        /** Not a series: series folders are named by slugs, which start with a letter or digit. */
+        private const val ASSETS_DIR = "_assets"
+        private const val WALKS_DIR = "_walks"
         private val SAFE = Regex("^[A-Za-z0-9._-]{1,200}$")
         private val PAGE_FILE = Regex("^\\d{3,}\\.[a-z0-9]{1,5}$")
 
@@ -182,12 +303,8 @@ class DownloadStore(val root: File) {
                 else -> "img"
             }
 
-        fun parseSizes(text: String): List<Pair<Int, Int>> =
-            if (text.isBlank()) emptyList() else text.split(',').map { s ->
-                val w = s.substringBefore('x').toIntOrNull() ?: 0
-                val h = s.substringAfter('x', "").toIntOrNull() ?: 0
-                w to h
-            }
+        fun sha1(text: String): String =
+            java.security.MessageDigest.getInstance("SHA-1").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
         private fun readProps(file: File): Properties =
             Properties().apply { if (file.isFile) runCatching { file.reader(Charsets.UTF_8).use { load(it) } } }

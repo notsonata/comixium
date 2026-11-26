@@ -705,6 +705,86 @@
     paintDownload(btn, chapterIdOf(location.pathname));
   }
 
+  // A series page's own Download button: the app asks what to download (all, unread, how many,
+  // which groups). The page's group filter knows every group; it's opened out of sight to read them.
+  function seriesGroups() {
+    return new Promise(function (resolve) {
+      var wrap = document.querySelector('.mpage__group');
+      var trigger = wrap && wrap.querySelector(':scope > button');
+      function read() {
+        return [].map.call(wrap.querySelectorAll('.fdrop__item'), function (i) {
+          var spans = i.querySelectorAll('span');
+          return (spans[spans.length - 1] || i).textContent.trim();
+        }).filter(function (t) { return t && !/^all groups$/i.test(t); });
+      }
+      if (!trigger) return resolve([]);
+      if (wrap.classList.contains('is-open')) return resolve(read());
+      setAttr(document.documentElement, 'data-cx-peek', '');
+      trigger.click();
+      var tries = 0;
+      (function poll() {
+        var got = read();
+        if (got.length || ++tries > 40) {
+          if (wrap.classList.contains('is-open')) trigger.click();
+          setTimeout(function () { setAttr(document.documentElement, 'data-cx-peek', null); }, 80);
+          return resolve(got);
+        }
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+  function offerSeriesDownload() {
+    var title = document.querySelector('.mpage__title');
+    var cover = document.querySelector('.mpage__poster img');
+    var read = document.querySelector('.mpage__read');
+    var m = read && /(\d+(?:\.\d+)?)/.exec(read.textContent || '');
+    seriesGroups().then(function (groups) {
+      if (!groups.length) {
+        [].forEach.call(document.querySelectorAll('.mchap-row__group span'), function (g) {
+          var t = g.textContent.trim();
+          if (t && groups.indexOf(t) < 0) groups.push(t);
+        });
+      }
+      post({
+        t: 'downloadMany', path: location.pathname,
+        series: title ? title.textContent.trim() : '', cover: cover ? (cover.currentSrc || cover.src || '') : '',
+        groups: groups, current: m ? m[1] : ''
+      });
+    });
+  }
+  function seriesDownload() {
+    var cta = document.querySelector('.mpage__cta');
+    if (!cta || cta.querySelector('.cx-dl-series')) return;
+    var b = makeDownloadButton('mpage__cta-icon cx-dl-series', offerSeriesDownload);
+    b.setAttribute('aria-label', 'Download chapters');
+    b.title = 'Download';
+    b.innerHTML = DL_SVG;
+    var more = cta.querySelector('[aria-label="More actions"]');
+    if (more && more.parentNode) more.parentNode.insertBefore(b, more); else cta.appendChild(b);
+  }
+
+  // Reaching the end of a chapter (the reader's "next chapter" block comes into view) counts as
+  // having read it: the app can delete a downloaded chapter afterwards (a setting).
+  var endTarget = null, endObserver = null, endSent = '', chapterSince = 0, chapterPath = '';
+  function watchReadEnd() {
+    if (!isReader()) return;
+    if (chapterPath !== location.pathname) { chapterPath = location.pathname; chapterSince = Date.now(); }
+    var el = document.querySelector('.rpage-chap-ending');
+    if (!el || el === endTarget || !window.IntersectionObserver) return;
+    endTarget = el;
+    if (endObserver) endObserver.disconnect();
+    endObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        // Not while the chapter is still laying out (the block can flash into view at first).
+        if (!e.isIntersecting || endSent === location.pathname || Date.now() - chapterSince < 4000) return;
+        if (!document.querySelector('.rpage-page')) return;
+        endSent = location.pathname;
+        post({ t: 'readEnd', path: location.pathname });
+      });
+    }, { threshold: 0.1 });
+    endObserver.observe(el);
+  }
+
   // --- State reporting ----------------------------------------------------------------------
   var VARS = {
     bg: '--bg', bg2: '--bg-2', surface: '--surface', surface2: '--surface-2', surface3: '--surface-3',
@@ -782,6 +862,8 @@
     fitSeriesHeader();
     chapterRows();
     readerDownload();
+    seriesDownload();
+    watchReadEnd();
     var s = snapshot();
     var key = JSON.stringify(s);
     if (key !== last) { last = key; post(s); }
