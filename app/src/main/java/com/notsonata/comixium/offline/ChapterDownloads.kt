@@ -124,7 +124,7 @@ class ChapterDownloads(
                 runCatching { server.rebuild(store) }
             }
             // Unfinished chapters go back in the queue, and so do chapters saved before the page was
-            // (1.9.0): preparing them again adds what the site's reader needs, keeping the images.
+            // (the first 1.9.0 build): preparing them again adds what the site's reader needs, keeping the images.
             all.filter { !it.complete || !it.recorded }.forEach { ch ->
                 if (queue.none { it.request.link == ch.link }) {
                     queue += Item(Request(ch.link, domain(), store.seriesTitle(ch.link.seriesSlug).orEmpty(), ch.label, ch.group))

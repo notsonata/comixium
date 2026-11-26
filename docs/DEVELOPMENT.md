@@ -157,10 +157,11 @@ version: tag `v1.3.0`, title "Comixium 1.3.0", asset `comixium-1.3.0.apk`.
   [`.github/tested-versions`](../.github/tested-versions), which happens only after that build
   has been tested on a phone. "Latest" (the README's download link) is always the newest listed
   version. Promoting a version is a one-line change to that file; the next merge to `main`
-  updates the release. Bump the version for every change to the app, so a tested version never
-  picks up untested code.
+  updates the release.
+- **Fixes to an untested version** go into that same version: don't bump, update its changelog
+  section, and the merge rebuilds its release. Start a new version only when asked to.
 
-To ship a new version, bump `appVersion` and add a `## x.y.z` section to the changelog.
+To start a new version, bump `appVersion` and add a `## x.y.z` section to the changelog.
 Changelog style: short headed bullet lists, no first person.
 
 ## Project layout
