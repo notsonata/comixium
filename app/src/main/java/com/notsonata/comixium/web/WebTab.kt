@@ -33,6 +33,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.notsonata.comixium.BuildConfig
 import com.notsonata.comixium.offline.ChapterLink
+import com.notsonata.comixium.offline.OfflineServer
 import java.io.ByteArrayInputStream
 
 data class WebError(val url: String, val code: Int, val description: String, val isHttp: Boolean = false)
@@ -46,6 +47,8 @@ class WebTab(
     /** Page this tab starts on and returns to when its bottom-bar item is tapped again; null = blank until told. */
     val startPath: String?,
     private val engine: WebEngine,
+    /** Open downloaded chapters from disk even when online (the Downloaded screen's reader). */
+    private val preferOffline: Boolean = false,
 ) {
     var url by mutableStateOf<String?>(null)
         private set
@@ -75,6 +78,8 @@ class WebTab(
 
     private val main = Handler(Looper.getMainLooper())
     private val contextWrapper = MutableContextWrapper(null)
+    /** The page on screen came from a download (so its chapter data must too: it matches that page's scripts). */
+    @Volatile private var replaying = false
     private var created = false
     private var clearHistoryOnLoad = false
     /** Path requested before the views existed (e.g. a More-screen link); loaded on attach. */
@@ -297,6 +302,21 @@ class WebTab(
             runCatching { org.json.JSONObject(json) }.getOrNull()?.let { engine.onPagePref(it.optString("key"), it.opt("value")) }
             return
         }
+        if (PageState.type(json) == "readEnd") {
+            val o = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return
+            ChapterLink.parse(o.optString("path"))?.let(engine::onReadEnd)
+            return
+        }
+        if (PageState.type(json) == "downloadMany") {
+            val o = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return
+            val slug = ChapterLink.seriesSlugOf(o.optString("path")) ?: return
+            val arr = o.optJSONArray("groups")
+            val groups = (0 until (arr?.length() ?: 0)).map { arr!!.optString(it) }.filter { it.isNotBlank() }.distinct()
+            engine.onSeriesDownloadTap(
+                WebEngine.SeriesDownloadOffer(slug, o.optString("series"), o.optString("cover"), groups, o.optString("current")),
+            )
+            return
+        }
         if (PageState.type(json) == "download") {
             val o = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return
             val link = ChapterLink.parse(o.optString("path")) ?: return
@@ -392,6 +412,17 @@ class WebTab(
 
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val target = request.url.toString()
+            val mode = OfflineServer.Mode(online = engine.connectivity.online, preferOffline = preferOffline, replaying = replaying)
+            val served = runCatching { engine.downloads.server.lookup(target, request.method, request.isForMainFrame, mode) }.getOrNull()
+            if (request.isForMainFrame) replaying = served?.isPage == true
+            if (served != null) {
+                val stream = runCatching { java.io.FileInputStream(served.file) }.getOrNull()
+                if (stream != null) {
+                    val mime = served.type.substringBefore(';').trim()
+                    val charset = Regex("charset=([^;]+)", RegexOption.IGNORE_CASE).find(served.type)?.groupValues?.get(1)?.trim()
+                    return WebResourceResponse(mime, charset, 200, "OK", served.headers, stream)
+                }
+            }
             val accept = request.requestHeaders["Accept"] ?: request.requestHeaders["accept"]
             if (!engine.adBlocker.shouldBlock(target, accept, request.isForMainFrame)) return null
             main.post { engine.noteBlocked() }
@@ -419,6 +450,7 @@ class WebTab(
             this@WebTab.url = url
             canGoBack = backTarget() >= 0
             isReader = Site.isReaderUrl(url)
+            engine.onTabUrl()
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, err: WebResourceErrorCompat) {

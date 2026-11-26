@@ -11,6 +11,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import com.notsonata.comixium.offline.ChapterDownloads
 import com.notsonata.comixium.offline.ChapterLink
+import com.notsonata.comixium.offline.Connectivity
+import com.notsonata.comixium.offline.DownloadPrefs
 import com.notsonata.comixium.ui.theme.ComixColors
 import com.notsonata.comixium.ui.theme.withSiteTheme
 import kotlinx.coroutines.Dispatchers
@@ -33,14 +35,57 @@ class WebEngine(private val app: Application) {
         loadAsync()
     }
 
+    /** Whether the phone is online, for downloads and for answering pages from them. */
+    val connectivity = Connectivity(app)
+
+    val downloadPrefs = DownloadPrefs(prefs)
+
     /** Chapters saved for offline reading. */
-    val downloads = ChapterDownloads(app, adBlocker).also {
+    val downloads = ChapterDownloads(app, adBlocker, downloadPrefs, connectivity).also {
         it.onChange = { pushDownloadStates() }
         it.domain = { domain }
     }
 
     /** A downloaded (or downloading) chapter whose button was tapped: the UI offers what to do with it. */
     var downloadPrompt by mutableStateOf<ChapterLink?>(null)
+
+    /** A series page's Download button was tapped: the UI offers what to download. */
+    var seriesDownload by mutableStateOf<SeriesDownloadOffer?>(null)
+
+    /** What a series page knows when its Download button is tapped. */
+    data class SeriesDownloadOffer(
+        val slug: String,
+        val title: String,
+        val cover: String,
+        /** Scanlation groups, as the page's group filter lists them. */
+        val groups: List<String>,
+        /** Where the reader left off ("185"), from the page's Continue button; "" if not started. */
+        val current: String,
+    )
+
+    fun onSeriesDownloadTap(o: SeriesDownloadOffer) {
+        seriesDownload = o
+    }
+
+    /** Downloaded chapters read to the end, deleted once no page shows them (setting). */
+    private val readToDelete = mutableSetOf<ChapterLink>()
+
+    /** A reader page reached the end of its chapter. */
+    fun onReadEnd(link: ChapterLink) {
+        if (!downloads.isDownloaded(link)) return
+        downloads.markRead(link)
+        if (downloadPrefs.deleteAfterRead) readToDelete += link
+    }
+
+    /** A tab moved to another page: delete read chapters nothing shows any more. */
+    fun onTabUrl() {
+        if (readToDelete.isEmpty()) return
+        val shown = tabs.values.filter { it.isCreated }.mapNotNull { ChapterLink.parse(Site.pathOnly(it.url)) }.toSet()
+        readToDelete.filter { it !in shown }.forEach { link ->
+            readToDelete -= link
+            downloads.delete(link)
+        }
+    }
 
     /** A page's download button: start the chapter, or ask about one already saved or on its way. */
     fun onDownloadTap(link: ChapterLink, series: String, label: String, group: String, cover: String) {
@@ -121,7 +166,8 @@ class WebEngine(private val app: Application) {
     private val tabs = linkedMapOf<String, WebTab>()
 
     /** Tabs live as long as the process, so switching tabs or recreating the activity keeps pages. */
-    fun tab(key: String, startPath: String?): WebTab = tabs.getOrPut(key) { WebTab(key, startPath, this) }
+    fun tab(key: String, startPath: String?, preferOffline: Boolean = false): WebTab =
+        tabs.getOrPut(key) { WebTab(key, startPath, this, preferOffline) }
 
     val createdTabs: Collection<WebTab> get() = tabs.values
 

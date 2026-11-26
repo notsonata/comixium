@@ -69,10 +69,10 @@ Pick Mihon instead if you want one library across many sites, or a library that 
 
 **Downloads**
 
-- Download chapters from the button on each chapter row of a series page, or from the reader's controls
-- Read them in More → Downloads with no connection: a long strip with pinch zoom, the page you stopped on, and the next downloaded chapter one tap away
+- Download one chapter from the button beside it, or many from a series page's Download button: unread, all, or from a chapter; any number of them; from the scanlators you prefer, one version per chapter
+- Downloaded chapters open in the usual reader, comments included, with no connection; find them in Library → Downloaded
+- Optionally delete chapters once read, or only download on Wi-Fi
 - Downloading doesn't count as reading: reading progress and history on comix stay as they were
-- Download states show on the chapter rows: waiting, progress, done, failed
 
 **Handy extras**
 
@@ -114,7 +114,7 @@ Google blocks its sign-in inside apps that display web pages, so the button is h
 <details>
 <summary><b>How do downloads work?</b></summary>
 <br>
-Tap the download button next to a chapter on a series page, or in the reader's controls. The app opens the chapter out of sight to find its pages (keep Comixium open for that part, usually a few seconds), then saves the images. Downloaded chapters live in More → Downloads and open without a connection. They're stored inside the app, so uninstalling removes them; delete them per chapter, per series or all at once in Downloads. Opening a chapter to download it doesn't mark it read on comix.
+Tap the download button next to a chapter, or a series page's Download button to pick many (unread, all, or from a chapter; how many; which scanlators). The app opens each chapter out of sight and saves what the site's reader needs: the page, the chapter data, the comments if wanted, and the images. Keep Comixium open while chapters are prepared (a few seconds each); the images keep downloading in the background. Downloaded chapters are in Library → Downloaded and open in the usual reader, with or without a connection; offline, the reader's chapter list is empty, but Prev and Next move between downloaded chapters. They're stored inside the app, so uninstalling removes them. More → Downloads shows what's downloading and has the settings. Opening a chapter to download it doesn't mark it read on comix.
 </details>
 
 <details>

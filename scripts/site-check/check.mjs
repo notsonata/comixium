@@ -150,6 +150,13 @@ try {
     const dl = await until(() => page.evaluate(() => window.__msgs.find(m => m.t === 'download') || null), 2000);
     checkData('Download tap names the chapter, series and cover', dl && /-chapter-/.test(dl.path) && dl.label && dl.series && dl.cover,
       dl ? JSON.stringify({ path: dl.path, label: dl.label, group: dl.group, series: dl.series }) : 'no message', 'downloads (labels, cover)');
+    checkData('Chapter search box and sort (`.mchap-search input`, `.mchap-toolbar__sort`)', await page.$('.mchap-search input') && await page.$('.mchap-toolbar__sort .useg__btn'), '', 'series downloads');
+    check('Download button beside Read (`.mpage__cta`)', await until(() => page.$('.mpage__cta .cx-dl-series')), '', 'series downloads');
+    await page.evaluate(() => { window.__msgs.length = 0; document.querySelector('.mpage__cta .cx-dl-series')?.click(); });
+    const many = await until(() => page.evaluate(() => window.__msgs.find(m => m.t === 'downloadMany') || null), 4000);
+    checkData('Series Download lists the groups (`.mpage__group` menu)', many && many.groups && many.groups.length > 0 && many.series,
+      many ? JSON.stringify({ groups: many.groups.slice(0, 4), current: many.current, series: many.series }) : 'no message', 'series downloads (scanlators)');
+    check('Group menu closed again after reading it', !(await page.$('.mpage__group.is-open')), '', 'series downloads');
 
   }
 
@@ -197,32 +204,95 @@ try {
       check('Pinch zoom enabled on chapters', await page.evaluate(() => /user-scalable=yes/.test(document.querySelector('meta[name=viewport]').content)), '', 'pinch zoom');
       check('Download button among the reader controls', await page.$('.rpage-floatctl__col .cx-dl-reader'), '', 'download from the reader');
       check('Chapter title reads "<series> · <chapter>"', await page.evaluate(() => / · \S/.test(document.title)), await page.evaluate(() => document.title), 'download labels');
+      const ending = await page.evaluate(() => ({
+        group: (document.querySelector('.rpage-chap-ending__meta strong') || {}).textContent || '',
+        nav: [...document.querySelectorAll('.rpage-chap-ending__nav-btn')].map(b => b.textContent.replace(/\s+/g, ' ').trim()),
+      }));
+      // "Next · Ch. 186"; on the newest chapter just "Next" (no number: the series ends there).
+      check('Chapter ending names the group and the chapters around it (`.rpage-chap-ending`)', ending.group && ending.nav.some(t => /^Next\b/.test(t)) && ending.nav.every(t => /^(Prev|Next)\b/.test(t)), JSON.stringify(ending), 'series downloads, "read to the end"');
     }
 
-    // Downloads find a chapter's pages by letting the reader fill them in (collect.js), in a page
-    // of its own with every image answered by a placeholder, as the app does.
+    // Downloads run collect.js in a page of their own, with every image answered by a placeholder
+    // (as the app does), then open the saved chapter with the network cut, as the app does offline.
     section = 'Downloads';
-    const dctx = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36',
-      viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true,
-    });
-    await dctx.addInitScript({ content: 'window.__got=[];window.ComixiumCollector={postMessage:function(s){window.__got.push(JSON.parse(s));}};' + collectScript });
+    const UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36';
     const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
-    await dctx.route('**/*', r => r.request().resourceType() === 'image' ? r.fulfill({ status: 200, contentType: 'image/png', body: pixel }) : r.continue());
-    const dpage = await dctx.newPage();
-    await dpage.goto(BASE + chapterHref, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-    const end = await until(() => dpage.evaluate(() => window.__got.find(m => m.type !== 'progress') || null), 150000);
+    /** Runs one collector job on [path]; returns its messages and the chapter-data request flags. */
+    async function collect(path, job) {
+      const c = await browser.newContext({ userAgent: UA, viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+      // The app answers the hello with the job; only site pages get the script (not about:blank).
+      await c.addInitScript({ content: `if (/comix\\.(ws|to)$/.test(location.hostname)) { window.__got = []; window.ComixiumCollector = { onmessage: null, postMessage: function (s) {
+        var m = JSON.parse(s); window.__got.push(m);
+        if (m.type === 'hello') setTimeout(function () { window.ComixiumCollector.onmessage({ data: ${JSON.stringify(JSON.stringify(job))} }); }, 0); } }; ${collectScript} }` });
+      await c.route('**/*', r => {
+        const q = r.request();
+        if (q.resourceType() === 'image') return r.fulfill({ status: 200, contentType: 'image/png', body: pixel });
+        // The app drops progress uploads.
+        if (/\/api\/v1\/user\//.test(q.url()) && q.method() !== 'GET') return r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"ok","result":null}' });
+        return r.continue();
+      });
+      const flags = [];
+      c.on('request', q => { const m = /\/api\/v1\/chapters\/\d+\?(.*)/.exec(q.url()); if (m) flags.push(m[1]); });
+      const p = await c.newPage();
+      await p.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+      const end = await until(() => p.evaluate(() => window.__got && window.__got.find(m => ['pages', 'failed', 'rows', 'info'].includes(m.type)) || null), 200000);
+      const msgs = await p.evaluate(() => window.__got || []).catch(() => []);
+      await c.close();
+      if (end && end.why === 'check') dataChallenged = true;
+      return { end, msgs, flags };
+    }
+
+    // Series downloads look numbers up with the series page's chapter search (one page of results, never paging).
+    const series = chapterHref.replace(/\/[^/]+$/, '');
+    const first = await collect(series, { mode: 'first', have: [] });
+    const firstRows = first.end && first.end.type === 'rows' ? first.end.rows : [];
+    checkData('Oldest-first list gives the first chapter', firstRows.length && Math.min(...firstRows.map(r => parseFloat(r.number))) <= 1, firstRows.slice(0, 3).map(r => r.number).join(', '), 'series downloads ("All")');
+    const find = await collect(series, { mode: 'find', number: '2', have: [] });
+    const rows = find.end && find.end.type === 'rows' ? find.end.rows : [];
+    checkData('Chapter search finds every version of a number', rows.length && rows.every(r => r.number === '2' && /-chapter-2$/.test(r.path)), rows.map(r => r.group).join(', ') || JSON.stringify(find.end), 'series downloads');
+
+    // An early chapter, so it has a next one.
+    const saveHref = rows[0]?.path || chapterHref;
+    const { end, msgs, flags } = await collect(saveHref, { mode: 'chapter', comments: true, have: [] });
     const ok = end && end.type === 'pages' && end.found === end.total && end.total > 0 && end.urls.every(u => /^https:\/\//.test(u));
-    const why = end ? `${end.type} ${end.why || ''} ${end.found}/${end.total}` : 'no answer';
-    // A check page instead of the chapter is Cloudflare's doing, not a site change.
-    if (end && end.why === 'check') dataChallenged = true;
-    checkData('Every page image found by scrolling the reader', ok, why, 'downloads');
+    checkData('Every page image found by scrolling the reader', ok, end ? `${end.type} ${end.why || ''} ${end.found}/${end.total}` : 'no answer', 'downloads');
     checkData('Series title and cover found for downloads', end && end.series && /^https:\/\//.test(end.cover || ''), end ? JSON.stringify({ series: end.series, cover: (end.cover || '').slice(0, 60) }) : '', 'downloads (series name, cover)');
+    checkData('Chapter number, group and next chapter read from the reader', end && end.number && end.group && end.next, end ? JSON.stringify({ number: end.number, group: end.group, next: end.next }) : '', 'series downloads (one version per chapter)');
+    checkData("The collector doesn't trip the site's tamper flags (v=0)", flags.length && flags.every(f => /(^|&)v=0(&|$)/.test(f)), flags.map(f => f.replace(/&_=.*/, '')).join(' | '), 'downloads (not flagged as a bot)');
+    const answers = msgs.filter(m => m.type === 'answer');
+    const doc = msgs.find(m => m.type === 'document');
+    const chapterAnswer = answers.find(a => /\/api\/v1\/chapters\/\d+/.test(a.url));
+    checkData('Chapter page, chapter data (with x-enc) and comments saved', doc && /id="initial-data"/.test(doc.html) && chapterAnswer && chapterAnswer.enc && answers.some(a => /\/threads\/\d+\/comments/.test(a.url)),
+      `${answers.length} answers, enc ${chapterAnswer ? chapterAnswer.enc : '-'}, page ${doc ? doc.html.length : 0} chars`, 'offline reading in the site\'s reader, offline comments');
     if (ok) {
       const res = await fetch(end.urls[0], { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14)' } }).catch(e => ({ ok: false, status: String(e) }));
       check('Page images download without cookies or a referrer', res.ok && /^image\//.test(res.headers.get('content-type') || ''), String(res.status), 'downloads');
     }
-    await dctx.close();
+    if (ok && doc && chapterAnswer) {
+      // Offline: only what was saved, answered the way OfflineServer does.
+      const key = u => /(^|\.)comix\.(ws|to)$/.test(u.hostname) ? u.pathname + u.search : u.href;
+      const assets = new Map(msgs.filter(m => m.type === 'asset').map(m => [key(new URL(m.url)), m]));
+      const images = new Set(end.urls.map(u => new URL(u).pathname));
+      let hits = 0;
+      const oc = await browser.newContext({ userAgent: UA, viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+      await oc.addInitScript({ content: 'window.__msgs=[];window.ComixiumNative={postMessage:function(s){window.__msgs.push(JSON.parse(s));}};' + pageScript });
+      await oc.route('**/*', r => {
+        const q = r.request(), u = new URL(q.url());
+        if (u.pathname.startsWith('/hi/')) { if (images.has(u.pathname)) { hits++; return r.fulfill({ status: 200, contentType: 'image/png', body: pixel }); } return r.abort('internetdisconnected'); }
+        if (q.isNavigationRequest()) return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: doc.html });
+        const asset = assets.get(key(u));
+        if (asset) return r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: asset.ct, body: Buffer.from(asset.data, 'base64') });
+        if (/\/api\/v1\/chapters\/\d+/.test(u.pathname)) return r.fulfill({ status: 200, headers: { 'x-enc': chapterAnswer.enc }, contentType: chapterAnswer.type, body: chapterAnswer.body });
+        return r.abort('internetdisconnected');
+      });
+      const op = await oc.newPage();
+      await op.goto(BASE + saveHref, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+      const shown = await until(() => op.evaluate(() => document.querySelectorAll('.rpage-page img[src^="http"]').length || null), 15000);
+      check("A saved chapter opens offline in the site's reader", shown && hits > 0, `${shown || 0} pages shown, ${hits} images from the saved list`, 'offline reading');
+      check('Reader controls on the offline chapter', await until(() => op.$('.rpage-floatctl__col .cx-dl-reader'), 6000), '', 'offline reading (same reader UI)');
+      await oc.close();
+    }
+
   }
 
   // --- Other routes ---------------------------------------------------------------------------

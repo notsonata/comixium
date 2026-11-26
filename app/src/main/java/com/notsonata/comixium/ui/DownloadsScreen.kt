@@ -40,140 +40,145 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notsonata.comixium.offline.ChapterDownloads
 import com.notsonata.comixium.offline.ChapterLink
 import com.notsonata.comixium.offline.DownloadStore
+import com.notsonata.comixium.offline.SeriesWalk
 import com.notsonata.comixium.ui.icons.Lucide
 import com.notsonata.comixium.ui.theme.LocalComixColors
 import com.notsonata.comixium.ui.theme.Poppins
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private class SeriesRow(val series: DownloadStore.Series, val chapters: Int, val bytes: Long, val cover: ImageBitmap?)
+private val Body = TextStyle(fontFamily = Poppins, fontSize = 12.sp)
+private val RowTitle = TextStyle(fontFamily = Poppins, fontSize = 14.sp, fontWeight = FontWeight.Medium)
 
-/** Downloaded chapters: what's on its way, then each series. [seriesSlug] opens one series' chapters. */
+/**
+ * More → Downloads: what's downloading (chapters and series downloads), the download settings and
+ * the space used. The downloaded chapters themselves are in Library → Downloaded.
+ */
 @Composable
-fun DownloadsScreen(
-    downloads: ChapterDownloads,
-    seriesSlug: String?,
-    onSeries: (String) -> Unit,
-    onRead: (ChapterLink) -> Unit,
-) {
+fun DownloadsScreen(downloads: ChapterDownloads, onOpenDownloaded: () -> Unit) {
     val c = LocalComixColors.current
     val context = LocalContext.current
-    val store = downloads.store
+    val prefs = downloads.prefs
     val version = downloads.version
-    val series by produceState<List<SeriesRow>?>(null, version) {
+    val summary by produceState<Pair<Int, Long>?>(null, version) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                store.series().map { s ->
-                    val chapters = store.chapters(s.slug).filter { it.complete }
-                    SeriesRow(s, chapters.size, store.bytes(s.slug), store.coverFile(s.slug)?.let { thumb(it.path) })
-                }.filter { it.chapters > 0 }
-            }.getOrDefault(emptyList())
+                val chapters = downloads.store.allChapters().count { it.complete }
+                chapters to downloads.store.bytes()
+            }.getOrDefault(0 to 0L)
         }
     }
-    val chapters by produceState<List<DownloadStore.Chapter>?>(null, version, seriesSlug) {
-        value = if (seriesSlug == null) null else withContext(Dispatchers.IO) {
-            runCatching { store.chapters(seriesSlug).filter { it.complete } }.getOrDefault(emptyList())
-        }
-    }
-    var confirm by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
-    val queue = downloads.queue.filter { seriesSlug == null || it.request.link.seriesSlug == seriesSlug }
+    var confirmDeleteAll by remember { mutableStateOf(false) }
     fun size(b: Long) = Formatter.formatShortFileSize(context, b)
 
     LazyColumn(Modifier.fillMaxSize().background(c.bg).padding(horizontal = 16.dp)) {
-        if (queue.isNotEmpty()) {
-            item { SectionLabel("IN PROGRESS", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)) }
-            items(queue, key = { "q" + it.request.link.chapterId }) { item -> QueueRow(downloads, item, store) }
-            item {
+        val waiting = downloads.waitingFor
+        val busy = downloads.queue.isNotEmpty() || downloads.walks.isNotEmpty()
+        if (busy && waiting != null) item {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 16.dp).clip(RoundedCornerShape(12.dp)).background(c.surface).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Lucide.WifiOff, null, tint = c.text2, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(waiting, style = Body.copy(fontSize = 13.sp), color = c.text2)
+            }
+        }
+        if (downloads.walks.isNotEmpty()) {
+            item { SectionLabel("SERIES", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)) }
+            items(downloads.walks, key = { "w" + it.id }) { w -> WalkRow(downloads, w) }
+        }
+        if (downloads.queue.isNotEmpty()) {
+            item { SectionLabel("CHAPTERS", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)) }
+            items(downloads.queue, key = { "q" + it.request.link.chapterId }) { item -> QueueRow(downloads, item, downloads.store) }
+        }
+        if (busy) item {
+            Text(
+                "Keep Comixium open while chapters are prepared. Their pages keep downloading while you read.",
+                style = Body, color = c.text3, modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+            )
+        } else item {
+            Column(Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(c.surface), contentAlignment = Alignment.Center) {
+                    Icon(Lucide.Download, null, tint = c.accent, modifier = Modifier.size(24.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Nothing downloading", style = RowTitle.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold), color = c.textEmphasis)
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    "Keep Comixium open while chapters are prepared. Pages download while the app is open.",
-                    style = TextStyle(fontFamily = Poppins, fontSize = 12.sp), color = c.text3,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                    "Download a chapter with the button beside it, or many from a series page's Download button.",
+                    style = Body.copy(fontSize = 13.sp), color = c.text2, textAlign = TextAlign.Center,
                 )
             }
         }
-        if (seriesSlug == null) {
-            val list = series
-            if (list != null && list.isEmpty() && queue.isEmpty()) {
-                item { EmptyDownloads() }
-            } else if (list != null && list.isNotEmpty()) {
-                item { SectionLabel("SERIES", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)) }
-                items(list, key = { "s" + it.series.slug }) { row ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface)
-                            .clickable { onSeries(row.series.slug) }.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Cover(row.cover)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(row.series.title, style = TextStyle(fontFamily = Poppins, fontSize = 14.sp, fontWeight = FontWeight.Medium),
-                                color = c.textEmphasis, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text("${row.chapters} chapter${if (row.chapters == 1) "" else "s"} · ${size(row.bytes)}",
-                                style = TextStyle(fontFamily = Poppins, fontSize = 12.sp), color = c.text3)
-                        }
-                        Icon(Lucide.ChevronRight, null, tint = c.text4, modifier = Modifier.size(16.dp))
-                    }
-                }
-                item {
-                    val total = list.sumOf { it.bytes }
-                    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${size(total)} on this phone", style = TextStyle(fontFamily = Poppins, fontSize = 12.sp), color = c.text3, modifier = Modifier.weight(1f).padding(start = 4.dp))
-                        TextButton(onClick = { confirm = "Delete every downloaded chapter?" to downloads::deleteAll }) {
-                            Text("Delete all", color = c.danger)
-                        }
-                    }
-                }
-            }
-        } else {
-            val list = chapters
-            if (list != null) {
-                item { SectionLabel("CHAPTERS", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)) }
-                if (list.isEmpty() && queue.isEmpty()) item {
-                    Text("No chapters of this series are downloaded.", color = c.text2, modifier = Modifier.padding(4.dp))
-                }
-                items(list, key = { "c" + it.link.chapterId }) { ch ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface)
-                            .clickable { onRead(ch.link) }.heightIn(min = 56.dp).padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(ch.label, style = TextStyle(fontFamily = Poppins, fontSize = 14.sp, fontWeight = FontWeight.Medium), color = c.textEmphasis)
-                            val read = if (ch.lastPage > 0) " · read to page ${ch.lastPage}" else ""
-                            Text(listOf(ch.group, "${ch.pages} pages", size(ch.bytes)).filter { it.isNotBlank() }.joinToString(" · ") + read,
-                                style = TextStyle(fontFamily = Poppins, fontSize = 12.sp), color = c.text3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        IconButton(onClick = { confirm = "Delete ${ch.label}?" to { downloads.delete(ch.link) } }) {
-                            Icon(Lucide.Trash, "Delete ${ch.label}", tint = c.text3, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
-                if (list.isNotEmpty()) item {
-                    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 24.dp)) {
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = { confirm = "Delete every downloaded chapter of this series?" to { downloads.deleteSeries(seriesSlug) } }) {
-                            Text("Delete series", color = c.danger)
-                        }
-                    }
-                }
+        item {
+            Section("DOWNLOADED") {
+                val s = summary
+                LinkRow(
+                    Lucide.Bookmark, "Downloaded chapters",
+                    subtitle = if (s == null) "In Library" else "${s.first} chapter${if (s.first == 1) "" else "s"} · ${size(s.second)} · in Library",
+                    onClick = onOpenDownloaded,
+                )
             }
         }
+        item {
+            Section("SETTINGS") {
+                ToggleRow(Lucide.Message, "Download comments", "Read a chapter's comments offline too", prefs.comments, prefs::updateComments)
+                ToggleRow(Lucide.Trash, "Delete after reading", "Once a downloaded chapter is read to the end and closed", prefs.deleteAfterRead, prefs::updateDeleteAfterRead)
+                ToggleRow(Lucide.WifiOff, "Only on Wi-Fi", "Wait for Wi-Fi before downloading", prefs.wifiOnly, prefs::updateWifiOnly)
+            }
+        }
+        item {
+            Section("STORAGE") {
+                LinkRow(
+                    Lucide.Trash, "Delete all downloads",
+                    subtitle = summary?.let { "${size(it.second)} on this phone" },
+                    danger = true, chevron = false,
+                ) { confirmDeleteAll = true }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
     }
-    confirm?.let { (question, action) ->
-        AlertDialog(
-            onDismissRequest = { confirm = null },
-            text = { Text(question) },
-            confirmButton = { TextButton(onClick = { confirm = null; action() }) { Text("Delete", color = c.danger) } },
-            dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel", color = c.text2) } },
-            containerColor = c.surface,
-            textContentColor = c.text,
-        )
+    if (confirmDeleteAll) {
+        ConfirmDelete("Delete every downloaded chapter?", onConfirm = { confirmDeleteAll = false; downloads.deleteAll() }, onDismiss = { confirmDeleteAll = false })
+    }
+}
+
+@Composable
+private fun WalkRow(downloads: ChapterDownloads, w: SeriesWalk) {
+    val c = LocalComixColors.current
+    val what = when {
+        w.problem.isNotEmpty() -> w.problem
+        w.limit > 0 -> "${w.saved} of ${w.limit} chapters"
+        else -> "${w.saved} chapter${if (w.saved == 1) "" else "s"} so far, up to the latest"
+    }
+    val now = when (val s = w.step) {
+        SeriesWalk.Step.First -> "Finding the first chapter"
+        is SeriesWalk.Step.Find -> "Looking up Ch.${s.number}"
+        is SeriesWalk.Step.Peek -> "Checking what comes next"
+        is SeriesWalk.Step.Wait -> "Preparing Ch.${s.link.number}"
+        SeriesWalk.Step.Done -> ""
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface)
+            .padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(w.seriesTitle.ifBlank { w.seriesSlug }, style = RowTitle, color = c.textEmphasis, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val groups = if (w.groups.isEmpty()) "" else " · " + w.groups.joinToString(", ")
+            Text(what + groups, style = Body, color = if (w.problem.isNotEmpty()) c.danger else c.text3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (w.problem.isEmpty() && now.isNotEmpty()) Text(now, style = Body, color = c.text3)
+        }
+        if (w.problem.isNotEmpty() && !w.isDone) TextButton(onClick = { downloads.retryWalk(w) }) { Text("Retry", color = c.accent) }
+        IconButton(onClick = { downloads.cancelWalk(w) }) { Icon(Lucide.X, "Stop", tint = c.text3, modifier = Modifier.size(18.dp)) }
     }
 }
 
@@ -187,16 +192,15 @@ private fun QueueRow(downloads: ChapterDownloads, item: ChapterDownloads.Item, s
     Column(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface).padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("$title · $label", style = TextStyle(fontFamily = Poppins, fontSize = 14.sp, fontWeight = FontWeight.Medium),
-                    color = c.textEmphasis, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("$title · $label", style = RowTitle, color = c.textEmphasis, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     when (state) {
-                        ChapterDownloads.State.Queued -> "Waiting"
+                        ChapterDownloads.State.Queued -> listOf("Waiting", r.group).filter { it.isNotBlank() }.joinToString(" · ")
                         is ChapterDownloads.State.Preparing -> if (state.total > 0) "Finding pages · ${state.found} of ${state.total}" else "Opening the chapter"
                         is ChapterDownloads.State.Fetching -> "Downloading · ${state.done} of ${state.total} pages"
                         is ChapterDownloads.State.Failed -> state.why
                     },
-                    style = TextStyle(fontFamily = Poppins, fontSize = 12.sp),
+                    style = Body,
                     color = if (state is ChapterDownloads.State.Failed) c.danger else c.text3,
                 )
             }
@@ -220,8 +224,138 @@ private fun QueueRow(downloads: ChapterDownloads, item: ChapterDownloads.Item, s
     }
 }
 
+private class SeriesRow(val series: DownloadStore.Series, val chapters: Int, val unread: Int, val bytes: Long, val cover: ImageBitmap?)
+
+/**
+ * Library → Downloaded: downloaded series, and a series' chapters ([seriesSlug]). Chapters open in
+ * the site's own reader, from the phone.
+ */
 @Composable
-private fun EmptyDownloads() {
+fun DownloadedScreen(
+    downloads: ChapterDownloads,
+    seriesSlug: String?,
+    onSeries: (String) -> Unit,
+    onRead: (ChapterLink) -> Unit,
+    onOpenSeriesPage: (String) -> Unit,
+    onDownloadsPage: () -> Unit,
+) {
+    val c = LocalComixColors.current
+    val context = LocalContext.current
+    val store = downloads.store
+    val version = downloads.version
+    val series by produceState<List<SeriesRow>?>(null, version) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                store.series().map { s ->
+                    val chapters = store.chapters(s.slug).filter { it.complete }
+                    SeriesRow(s, chapters.size, chapters.count { !it.read }, store.bytes(s.slug), store.coverFile(s.slug)?.let { thumb(it.path) })
+                }.filter { it.chapters > 0 }
+            }.getOrDefault(emptyList())
+        }
+    }
+    val chapters by produceState<List<DownloadStore.Chapter>?>(null, version, seriesSlug) {
+        value = if (seriesSlug == null) null else withContext(Dispatchers.IO) {
+            runCatching { store.chapters(seriesSlug).filter { it.complete } }.getOrDefault(emptyList())
+        }
+    }
+    var confirm by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
+    fun size(b: Long) = Formatter.formatShortFileSize(context, b)
+    val inProgress = downloads.queue.size + downloads.walks.size
+
+    LazyColumn(Modifier.fillMaxSize().background(c.bg).padding(horizontal = 16.dp)) {
+        if (inProgress > 0 && seriesSlug == null) item {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(12.dp)).background(c.surface)
+                    .clickable(onClick = onDownloadsPage).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Lucide.Download, null, tint = c.accent, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("$inProgress downloading", style = RowTitle.copy(fontSize = 13.sp), color = c.text2, modifier = Modifier.weight(1f))
+                Icon(Lucide.ChevronRight, null, tint = c.text4, modifier = Modifier.size(16.dp))
+            }
+        }
+        if (seriesSlug == null) {
+            val list = series
+            if (list != null && list.isEmpty()) {
+                item { EmptyDownloaded() }
+            } else if (list != null) {
+                item { Spacer(Modifier.height(10.dp)) }
+                items(list, key = { "s" + it.series.slug }) { row ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface)
+                            .clickable { onSeries(row.series.slug) }.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Cover(row.cover)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(row.series.title, style = RowTitle, color = c.textEmphasis, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            val unread = if (row.unread in 1 until row.chapters) " · ${row.unread} unread" else if (row.unread == 0) " · all read" else ""
+                            Text("${row.chapters} chapter${if (row.chapters == 1) "" else "s"}$unread · ${size(row.bytes)}", style = Body, color = c.text3)
+                        }
+                        Icon(Lucide.ChevronRight, null, tint = c.text4, modifier = Modifier.size(16.dp))
+                    }
+                }
+                item { Spacer(Modifier.height(24.dp)) }
+            }
+        } else {
+            val list = chapters
+            if (list != null) {
+                item {
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { onOpenSeriesPage(seriesSlug) }) { Text("Series page", color = c.accent) }
+                        Spacer(Modifier.weight(1f))
+                        if (list.isNotEmpty()) {
+                            TextButton(onClick = { confirm = "Delete every downloaded chapter of this series?" to { downloads.deleteSeries(seriesSlug) } }) {
+                                Text("Delete all", color = c.danger)
+                            }
+                        }
+                    }
+                }
+                if (list.isEmpty()) item {
+                    Text("No chapters of this series are downloaded.", color = c.text2, modifier = Modifier.padding(4.dp))
+                }
+                items(list, key = { "c" + it.link.chapterId }) { ch ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface)
+                            .clickable { onRead(ch.link) }.heightIn(min = 56.dp).padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(ch.label, style = RowTitle, color = if (ch.read) c.text3 else c.textEmphasis)
+                            val parts = listOf(ch.group, "${ch.pages} pages", size(ch.bytes), if (ch.read) "read" else "", if (!ch.recorded) "updating" else "")
+                            Text(parts.filter { it.isNotBlank() }.joinToString(" · "), style = Body, color = c.text3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        IconButton(onClick = { confirm = "Delete ${ch.label}?" to { downloads.delete(ch.link) } }) {
+                            Icon(Lucide.Trash, "Delete ${ch.label}", tint = c.text3, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(24.dp)) }
+            }
+        }
+    }
+    confirm?.let { (question, action) ->
+        ConfirmDelete(question, onConfirm = { confirm = null; action() }, onDismiss = { confirm = null })
+    }
+}
+
+@Composable
+private fun ConfirmDelete(question: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val c = LocalComixColors.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        text = { Text(question) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete", color = c.danger) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = c.text2) } },
+        containerColor = c.surface,
+        textContentColor = c.text,
+    )
+}
+
+@Composable
+private fun EmptyDownloaded() {
     val c = LocalComixColors.current
     Column(Modifier.fillMaxWidth().padding(top = 64.dp, start = 16.dp, end = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(c.surface), contentAlignment = Alignment.Center) {
@@ -231,9 +365,8 @@ private fun EmptyDownloads() {
         Text("No downloads yet", style = TextStyle(fontFamily = Poppins, fontSize = 16.sp, fontWeight = FontWeight.SemiBold), color = c.textEmphasis)
         Spacer(Modifier.height(6.dp))
         Text(
-            "Tap the download button next to a chapter on a series page, or among the reader's buttons. Downloaded chapters open here without a connection.",
-            style = TextStyle(fontFamily = Poppins, fontSize = 13.sp), color = c.text2,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            "Download chapters from a series page: one with the button beside it, or many with the series' Download button. They open here without a connection, in the usual reader.",
+            style = TextStyle(fontFamily = Poppins, fontSize = 13.sp), color = c.text2, textAlign = TextAlign.Center,
         )
     }
 }
@@ -284,7 +417,7 @@ fun DownloadPromptDialog(
         text = {
             Text(
                 when {
-                    done -> "Read it here any time, even without a connection."
+                    done -> "It opens from the phone, with or without a connection."
                     state is ChapterDownloads.State.Failed -> state.why
                     state is ChapterDownloads.State.Fetching -> "${state.done} of ${state.total} pages so far."
                     state is ChapterDownloads.State.Preparing -> "Finding its pages. Keep Comixium open for a moment."
@@ -297,7 +430,7 @@ fun DownloadPromptDialog(
                 when {
                     done -> {
                         TextButton(onClick = { downloads.delete(link); onDismiss() }) { Text("Delete", color = c.danger) }
-                        TextButton(onClick = onRead) { Text("Read offline", color = c.accent) }
+                        TextButton(onClick = onRead) { Text("Downloaded", color = c.accent) }
                     }
                     item != null && state is ChapterDownloads.State.Failed -> {
                         TextButton(onClick = { downloads.cancel(item); onDismiss() }) { Text("Remove", color = c.text2) }

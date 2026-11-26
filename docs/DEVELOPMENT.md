@@ -18,31 +18,60 @@ everything around the pages is native (Kotlin, Jetpack Compose):
   - reports page state (URL, title, login, reader, theme colours) to the app;
   - adds reader touch controls and control layouts;
   - applies the mobile optimizations (`html[data-cx-mobile]`).
-  - adds download buttons to chapter rows and the reader controls (`setDownloads` paints their state).
+  - adds download buttons to chapter rows and the reader controls (`setDownloads` paints their state),
+    and a Download button to series pages (it reads the group filter's names out of sight);
+  - reports reaching the end of a chapter (`readEnd`), for "Delete after reading".
 
 ### Downloads
 
-Chapter images come from the encrypted API, so downloads let the site's own reader find them
+Chapter images and data come from an encrypted API, so downloads let the site's own reader do the
+work, and save enough of the page that the same reader runs offline
 (`app/src/main/java/.../offline`):
 
 1. **Collect** (`PageCollector` + `assets/inject/collect.js`): a WebView placed behind the app's
    screens loads the chapter. It has to be attached and drawn, just covered: the reader fills in a
    page's `<img>` only as it scrolls near, which needs frames. The script, injected only there,
-   shows the chapter as a long strip (it overrides the `settings_v2` read without saving it),
-   drops writes to `reader.progress*` and non-GET calls to `/api/v1/user/`, so the visit isn't
-   recorded as reading. Then it scrolls page by page and reports every `.rpage-page img` address,
-   plus the series title and cover from the page's embedded data. Every image request in this
-   WebView gets a 1x1 placeholder, so nothing heavy loads and the reader never retries.
-2. **Fetch** (`PageFetcher`): the images download directly, three at a time. The image hosts
-   need no cookies or referrer.
-3. **Store** (`DownloadStore`): `files/downloads/<series>/<chapter id>/001.webp` and so on, with
-   `chapter.properties` (label, group, page count and sizes, last page read). Chapters left
-   incomplete resume on the next launch.
-4. **Read** (`ui/OfflineReader`, `OfflinePage`): a WebView with `WebViewAssetLoader` serves a
-   generated long-strip page from those files; any other request is refused.
+   says hello and gets its job from the app (a reply on the same message channel). For a chapter
+   it shows a long strip (it overrides the `settings_v2` read without saving it), drops writes to
+   `reader.progress*`, scrolls page by page and reports every `.rpage-page img` address. Then it
+   reaches the end so the comments load, and sends what the reader needs offline: the page itself
+   (fetched again), the scripts, styles and Latin fonts it used, and the chapter data and comment
+   threads (asked for again by the addresses the page used; the chapter data keeps its `x-enc`
+   header). The app drops non-GET calls to `/api/v1/user/` (progress), so the visit isn't
+   recorded as reading. Every image request in this WebView gets a 1x1 placeholder.
+   The site reports pages whose `fetch`, `XMLHttpRequest.prototype.open` or `JSON.parse` were
+   replaced (`v=2&w=…` on its API calls), so the script wraps none of them; `Storage` isn't
+   reported. The site check verifies `v=0`.
+2. **Fetch** (`PageFetcher`): the images download directly, three at a time across chapters,
+   while the next chapter is prepared. The image hosts need no cookies or referrer.
+3. **Store** (`DownloadStore`): `files/downloads/<series>/<chapter id>/` holds the images
+   (`001.webp`…), `page.html`, `images.txt` (each page's image path), the API answers and
+   `chapter.properties` (label, group, next chapter number, read). Scripts and styles are shared by
+   all chapters in `_assets/` and pruned when nothing uses them. Unfinished work resumes on the
+   next launch.
+4. **Read** (`OfflineServer`, used by every tab's `shouldInterceptRequest`): image paths
+   (`/hi/…`, the same on every host and stable over time) and saved scripts are always answered
+   from disk. A downloaded chapter's page comes from disk when offline, or always in Library →
+   Downloaded (`DOWNLOADED_PAGE` tab, `preferOffline`). Its chapter data comes from disk only for a
+   page that came from disk (it has to match that page's scripts) or offline; comments only
+   offline. The app's page script runs on it as on any chapter, so the reader UI is the same.
+   Offline, the reader's chapter list is empty (paged API, not saved); Prev/Next work between
+   downloaded chapters.
+
+**Series downloads** (`SeriesWalk`): the series' chapter list is paged, and the site flags fast
+paging without taps, so a series download never pages it. It walks one number at a time: the series
+page's chapter search (`number=` on page 1) lists every group's version of a number; the first
+preferred group's version is queued (or the number is skipped when none has it), and that chapter's
+Next button (`.rpage-chap-ending__nav-btn`, "Next · Ch. 186"; a bare "Next" on the newest chapter)
+gives the next number. "All" starts from the oldest-first list; "Unread" from the number on the
+series page's Read/Continue button. The `peek` job reads the next number of a chapter that isn't
+saved.
+
+**Read to the end**: the page script reports when the reader's chapter ending comes into view; with
+"Delete after reading" on, the chapter is deleted once no tab shows it.
 
 Collecting pauses when the app leaves the screen (no frames), and resumes when it's back. The
-site check runs `collect.js` against a live chapter.
+site check runs `collect.js` against live pages and opens the saved chapter with the network cut.
 
 ### Ad blocking
 

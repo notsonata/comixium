@@ -77,7 +77,7 @@ fun MoreScreen(
             }
         }
         Section("OFFLINE") {
-            LinkRow(Lucide.Download, "Downloads", subtitle = "Chapters saved to read without a connection", onClick = onDownloads)
+            LinkRow(Lucide.Download, "Downloads", subtitle = "Downloading, and download settings", onClick = onDownloads)
         }
         SectionLabel("BROWSE", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp))
         BrowseGrid(onOpen)

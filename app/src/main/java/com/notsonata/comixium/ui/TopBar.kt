@@ -6,6 +6,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -57,6 +63,10 @@ fun ComixTopBar(
     onProfile: () -> Unit,
     /** Shown on series pages. */
     onShare: (() -> Unit)? = null,
+    /** Sections shown in place of the title (the Library tab: Library / Downloaded). */
+    sections: List<String>? = null,
+    selectedSection: Int = 0,
+    onSection: (Int) -> Unit = {},
 ) {
     val c = LocalComixColors.current
     Row(
@@ -74,7 +84,30 @@ fun ComixTopBar(
             Spacer(Modifier.width(12.dp))
         }
         // Title changes crossfade quickly instead of popping.
-        AnimatedContent(
+        if (sections != null && !showBack) {
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                sections.forEachIndexed { i, label ->
+                    val on = i == selectedSection
+                    Box(
+                        Modifier
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (on) c.surface2 else androidx.compose.ui.graphics.Color.Transparent)
+                            .clickable { onSection(i) }
+                            .semantics { selected = on; role = Role.Tab }
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            label,
+                            style = TextStyle(fontFamily = Poppins, fontWeight = FontWeight.SemiBold, fontSize = if (on) 16.sp else 15.sp),
+                            color = if (on) c.textEmphasis else c.text3,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        } else AnimatedContent(
             targetState = if (showBrand && !showBack) null else title,
             transitionSpec = { fadeIn(tween(140, delayMillis = 40)) togetherWith fadeOut(tween(90)) },
             contentAlignment = Alignment.CenterStart,
