@@ -156,14 +156,13 @@ private fun WalkRow(downloads: ChapterDownloads, w: SeriesWalk) {
     val c = LocalComixColors.current
     val what = when {
         w.problem.isNotEmpty() -> w.problem
-        w.limit > 0 -> "${w.saved} of ${w.limit} chapters"
-        else -> "${w.saved} chapter${if (w.saved == 1) "" else "s"} so far, up to the latest"
+        w.limit > 0 -> "Found ${w.saved} of ${w.limit} chapters"
+        else -> "Found ${w.saved} chapter${if (w.saved == 1) "" else "s"} so far, up to the latest"
     }
     val now = when (val s = w.step) {
         SeriesWalk.Step.First -> "Finding the first chapter"
         is SeriesWalk.Step.Find -> "Looking up Ch.${s.number}"
         is SeriesWalk.Step.Peek -> "Checking what comes next"
-        is SeriesWalk.Step.Wait -> "Preparing Ch.${s.link.number}"
         SeriesWalk.Step.Done -> ""
     }
     Row(
@@ -196,7 +195,11 @@ private fun QueueRow(downloads: ChapterDownloads, item: ChapterDownloads.Item, s
                 Text(
                     when (state) {
                         ChapterDownloads.State.Queued -> listOf("Waiting", r.group).filter { it.isNotBlank() }.joinToString(" · ")
-                        is ChapterDownloads.State.Preparing -> if (state.total > 0) "Finding pages · ${state.found} of ${state.total}" else "Opening the chapter"
+                        is ChapterDownloads.State.Preparing -> when {
+                            state.total == 0 -> "Opening the chapter"
+                            state.found < state.total -> "Finding pages · ${state.found} of ${state.total}"
+                            else -> "Saving the chapter page" + if (downloads.prefs.comments) " and comments" else ""
+                        }
                         is ChapterDownloads.State.Fetching -> "Downloading · ${state.done} of ${state.total} pages"
                         is ChapterDownloads.State.Failed -> state.why
                     },
@@ -209,11 +212,7 @@ private fun QueueRow(downloads: ChapterDownloads, item: ChapterDownloads.Item, s
             }
             IconButton(onClick = { downloads.cancel(item) }) { Icon(Lucide.X, "Cancel", tint = c.text3, modifier = Modifier.size(18.dp)) }
         }
-        val progress = when (state) {
-            is ChapterDownloads.State.Preparing -> if (state.total > 0) 0.1f * state.found / state.total else 0f
-            is ChapterDownloads.State.Fetching -> 0.1f + 0.9f * state.done / state.total.coerceAtLeast(1)
-            else -> null
-        }
+        val progress = ChapterDownloads.progressOf(state)
         if (progress != null) {
             LinearProgressIndicator(
                 progress = { progress },

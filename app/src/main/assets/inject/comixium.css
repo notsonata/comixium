@@ -682,3 +682,19 @@ html[data-cx-mobile] .mpage__badges {
   background: repeating-conic-gradient(color-mix(in srgb, currentColor 45%, transparent) 0 6%, transparent 0 12.5%);
 }
 @keyframes cx-dl-spin { to { transform: rotate(1turn); } }
+
+/* A series page's Download button (see seriesDownload): solid like Read beside it, so it stands out
+   from the page's plain icon buttons, and as tall as Read. */
+.mpage__cta .cx-dl-series {
+  align-self: stretch;
+  width: 44px;
+  height: auto;
+  min-height: 38px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.mpage__cta .cx-dl-series:hover,
+.mpage__cta .cx-dl-series:active {
+  background: var(--accent-2, var(--accent));
+  color: var(--accent-ink);
+}

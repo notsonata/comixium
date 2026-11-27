@@ -7,15 +7,16 @@ Each section becomes the notes of the GitHub release for that version.
 Downloads:
 
 - Download a chapter for offline reading from the button on its row on a series page, or from the reader's controls (the button can be hidden like the others)
-- Download many chapters from a series page's Download button: unread (from where you left off), all, or from a chapter number; up to the latest, 5, 10, 25 or any number
+- Download many chapters from a series page's Download button (solid, beside Read): unread (from where you left off), all, or from a chapter number; up to the latest, 5, 10, 25 or any number
+- A series download lists each chapter as waiting as soon as it's found (a few seconds each), in More → Downloads and on the series page, without waiting for earlier ones to download
 - Pick scanlators in order of preference: each chapter is downloaded once, from the first picked group that has it, so duplicate listings from several groups don't multiply the download
 - Downloaded chapters open in the usual reader, with the same controls, settings and comments, with or without a connection
-- Comments are saved with each chapter (Download comments, on by default)
+- Comments are saved with each chapter (Download comments, on by default), also for accounts that load comments only on request
 - Library has a Downloaded section beside the site's library: downloads by series, with sizes and delete per chapter, per series or all; the offline screen links to it
 - More → Downloads shows what's downloading and the download settings: delete chapters once read to the end, download comments, only on Wi-Fi
-- Chapter rows show each download's state: waiting, progress, done, failed
+- Chapter rows show each download's state: waiting, progress (the same as in More → Downloads, from finding the pages to the last image), done, failed
 - Downloading doesn't count as reading: progress and history on comix stay as they were
-- Keep the app open while chapters are prepared (a few seconds each); pages keep downloading in the background, and unfinished downloads resume the next time the app opens
+- Keep the app open while chapters are prepared (a few seconds each); pages keep downloading in the background, and waiting or unfinished downloads resume the next time the app opens
 - Chapters downloaded with the first 1.9.0 build are updated for the new reader the next time the app is open and online; their images are kept
 
 Fixes:

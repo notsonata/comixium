@@ -34,7 +34,9 @@ work, and save enough of the page that the same reader runs offline
    says hello and gets its job from the app (a reply on the same message channel). For a chapter
    it shows a long strip (it overrides the `settings_v2` read without saving it), drops writes to
    `reader.progress*`, scrolls page by page and reports every `.rpage-page img` address. Then it
-   reaches the end so the comments load, and sends what the reader needs offline: the page itself
+   reaches the end so the comments load (tapping `.rpage-load-comments button` for accounts that
+   turned off loading them automatically; a chapter without a thread stops after the look-up),
+   and sends what the reader needs offline: the page itself
    (fetched again), the scripts, styles and Latin fonts it used, and the chapter data and comment
    threads (asked for again by the addresses the page used; the chapter data keeps its `x-enc`
    header). The app drops non-GET calls to `/api/v1/user/` (progress), so the visit isn't
@@ -47,25 +49,29 @@ work, and save enough of the page that the same reader runs offline
 3. **Store** (`DownloadStore`): `files/downloads/<series>/<chapter id>/` holds the images
    (`001.webp`…), `page.html`, `images.txt` (each page's image path), the API answers and
    `chapter.properties` (label, group, next chapter number, read). Scripts and styles are shared by
-   all chapters in `_assets/` and pruned when nothing uses them. Unfinished work resumes on the
-   next launch.
+   all chapters in `_assets/` and pruned when nothing uses them. The queue is kept in
+   `_queue.properties`, so waiting and unfinished chapters resume on the next launch.
 4. **Read** (`OfflineServer`, used by every tab's `shouldInterceptRequest`): image paths
    (`/hi/…`, the same on every host and stable over time) and saved scripts are always answered
    from disk. A downloaded chapter's page comes from disk when offline, or always in Library →
    Downloaded (`DOWNLOADED_PAGE` tab, `preferOffline`). Its chapter data comes from disk only for a
    page that came from disk (it has to match that page's scripts) or offline; comments only
-   offline. The app's page script runs on it as on any chapter, so the reader UI is the same.
+   offline (keyed with the chapter's `page_url` reduced to its path, so either domain matches). The app's page script runs on it as on any chapter, so the reader UI is the same.
    Offline, the reader's chapter list is empty (paged API, not saved); Prev/Next work between
    downloaded chapters.
 
 **Series downloads** (`SeriesWalk`): the series' chapter list is paged, and the site flags fast
 paging without taps, so a series download never pages it. It walks one number at a time: the series
 page's chapter search (`number=` on page 1) lists every group's version of a number; the first
-preferred group's version is queued (or the number is skipped when none has it), and that chapter's
-Next button (`.rpage-chap-ending__nav-btn`, "Next · Ch. 186"; a bare "Next" on the newest chapter)
-gives the next number. "All" starts from the oldest-first list; "Unread" from the number on the
-series page's Read/Continue button. The `peek` job reads the next number of a chapter that isn't
-saved.
+preferred group's version is queued (or the number is skipped when none has it), and a `peek` of
+that chapter reads its Next button (`.rpage-chap-ending__nav-btn`, "Next · Ch. 186"; a bare "Next"
+on the newest chapter) for the next number. "All" starts from the oldest-first list; "Unread" from
+the number on the series page's Read/Continue button. Look-ups run in a second hidden WebView
+(`ChapterDownloads.finder`) alongside chapter preparation, so every chapter shows as waiting as
+soon as it's found.
+
+**Progress** (`ChapterDownloads.progressOf`): finding a chapter's pages is the first half, its
+images the second; the Downloads list and the ring on a chapter row show the same value.
 
 **Read to the end**: the page script reports when the reader's chapter ending comes into view; with
 "Delete after reading" on, the chapter is deleted once no tab shows it.

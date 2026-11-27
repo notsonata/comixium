@@ -2,10 +2,11 @@ package com.notsonata.comixium.offline
 
 /**
  * Downloading many chapters of a series, one chapter number at a time, the way a reader goes
- * through it. Each number usually has several versions (one per scanlation group); the walk saves
+ * through it. Each number usually has several versions (one per scanlation group); the walk queues
  * one of them, preferring [groups] in order, and moves on to the number the reader's Next button
  * names. It never pages through the site's chapter list: it looks numbers up with the series
- * page's chapter search, which the site offers for exactly that.
+ * page's chapter search, which the site offers for exactly that. It runs ahead of the downloads,
+ * so every chapter it finds shows up as waiting straight away.
  *
  * Pure Kotlin (state, choices and persistence as plain maps), so it's unit-tested.
  */
@@ -34,10 +35,8 @@ data class SeriesWalk(
         data object First : Step
         /** Look up the versions of chapter [number] (the series page's chapter search). */
         data class Find(val number: String) : Step
-        /** Open a chapter without saving it, just to read which number comes next. */
+        /** Open a chapter without saving it, just to read which number its Next button names. */
         data class Peek(val path: String) : Step
-        /** Waiting for [link] (queued by this walk) to be prepared; its Next button gives the next number. */
-        data class Wait(val link: ChapterLink) : Step
         data object Done : Step
     }
 
@@ -67,6 +66,11 @@ data class SeriesWalk(
         return Choice.Save(versions.firstOrNull { lastGroup.isNotEmpty() && it.group.equals(lastGroup, ignoreCase = true) } ?: versions.first())
     }
 
+    /** [row] was queued: count it, then find out what comes after it (unless that was the last one wanted). */
+    fun queued(row: Row): SeriesWalk = copy(saved = saved + 1, lastGroup = row.group).let {
+        if (it.isFull) it.copy(step = Step.Done) else it.copy(step = Step.Peek(row.path))
+    }
+
     /** Moves on to [next] (the number after the one just handled), or finishes. */
     fun advance(next: String): SeriesWalk = when {
         isFull -> copy(step = Step.Done)
@@ -90,7 +94,6 @@ data class SeriesWalk(
             Step.First -> put("step", "first")
             is Step.Find -> { put("step", "find"); put("arg", s.number) }
             is Step.Peek -> { put("step", "peek"); put("arg", s.path) }
-            is Step.Wait -> { put("step", "wait"); put("arg", s.link.path) }
             Step.Done -> put("step", "done")
         }
     }
@@ -115,7 +118,9 @@ data class SeriesWalk(
                 "first" -> Step.First
                 "find" -> Step.Find(arg)
                 "peek" -> Step.Peek(arg)
-                "wait" -> ChapterLink.parse(arg)?.let { Step.Wait(it) } ?: Step.Done
+                // Saved by a build that waited for each chapter: look its number up again (a chapter
+                // already queued or downloaded is stepped over).
+                "wait" -> ChapterLink.parse(arg)?.let { Step.Find(it.number) } ?: Step.Done
                 else -> Step.Done
             }
             return SeriesWalk(

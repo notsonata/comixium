@@ -96,13 +96,20 @@ class OfflineServer {
         fun chapterIdOfApi(url: String): String? =
             if (Site.isSiteUrl(url)) CHAPTER_API.matchEntire(Site.pathOnly(url))?.groupValues?.get(1) else null
 
-        /** Saved answers other than chapter data: the comment threads. Key = path + sorted stable query. */
+        /**
+         * Saved answers other than chapter data: the comment threads. Key = path + sorted stable query,
+         * with a site address in the query (the chapter's page_url) reduced to its path, so comments
+         * saved on one domain are found when the chapter is read on the other.
+         */
         fun answerKey(url: String): String? {
             if (!Site.isSiteUrl(url)) return null
             val path = Site.pathOnly(url)
             if (!path.startsWith("/api/v1/threads/")) return null
             val query = url.substringAfter('?', "").substringBefore('#')
-            val params = query.split('&').filter { it.isNotEmpty() && it.substringBefore('=') !in VOLATILE }.sorted()
+            val params = query.split('&').filter { it.isNotEmpty() && it.substringBefore('=') !in VOLATILE }.map { p ->
+                val value = runCatching { java.net.URLDecoder.decode(p.substringAfter('=', ""), "UTF-8") }.getOrNull()
+                if (value != null && Site.isSiteUrl(value)) p.substringBefore('=') + "=" + Site.pathOf(value) else p
+            }.sorted()
             return if (params.isEmpty()) path else path + "?" + params.joinToString("&")
         }
 

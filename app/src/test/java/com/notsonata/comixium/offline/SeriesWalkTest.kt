@@ -35,7 +35,7 @@ class SeriesWalkTest {
     }
 
     @Test fun advancesUntilTheLimitOrTheEnd() {
-        val w = SeriesWalk("w", "s", "S", limit = 2, saved = 1, step = SeriesWalk.Step.Wait(ChapterLink("s", "1", "50")))
+        val w = SeriesWalk("w", "s", "S", limit = 2, saved = 1, step = SeriesWalk.Step.Peek("/title/s/1-chapter-50"))
         assertEquals(SeriesWalk.Step.Find("51"), w.advance("51").step)
         assertTrue(w.copy(saved = 2).advance("51").isDone)
         assertTrue(w.advance("").isDone)
@@ -49,11 +49,26 @@ class SeriesWalkTest {
 
     @Test fun roundTripsEveryStep() {
         listOf(
-            SeriesWalk.Step.First, SeriesWalk.Step.Find("12.5"), SeriesWalk.Step.Peek("/title/s/1-chapter-3"),
-            SeriesWalk.Step.Wait(ChapterLink("s", "1", "3")), SeriesWalk.Step.Done,
+            SeriesWalk.Step.First, SeriesWalk.Step.Find("12.5"), SeriesWalk.Step.Peek("/title/s/1-chapter-3"), SeriesWalk.Step.Done,
         ).forEach { step ->
             val w = SeriesWalk("w1", "s", "Title", "https://x/c.jpg", listOf("A", "B C"), 10, 3, step, "A", listOf("1", "2"), "")
             assertEquals(w, SeriesWalk.fromMap(w.toMap()))
         }
+    }
+
+    @Test fun queuingAChapterLooksAheadUnlessThatWasTheLast() {
+        val w = SeriesWalk("w", "s", "S", limit = 2, step = SeriesWalk.Step.Find("50"))
+        val one = w.queued(row("Asura Scans"))
+        assertEquals(1, one.saved)
+        assertEquals("Asura Scans", one.lastGroup)
+        assertEquals(SeriesWalk.Step.Peek(row("Asura Scans").path), one.step)
+        assertTrue(one.queued(row("Asura Scans", "51")).isDone)
+        // Up to the latest never fills up.
+        assertEquals(SeriesWalk.Step.Peek(row("A", "51").path), w.copy(limit = 0, saved = 99).queued(row("A", "51")).step)
+    }
+
+    @Test fun aWalkSavedWhileWaitingOnAChapterLooksItsNumberUpAgain() {
+        val old = SeriesWalk("w1", "s", "T").toMap() + mapOf("step" to "wait", "arg" to "/title/s/77-chapter-12.5")
+        assertEquals(SeriesWalk.Step.Find("12.5"), SeriesWalk.fromMap(old)?.step)
     }
 }

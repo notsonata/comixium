@@ -39,6 +39,7 @@ data class ChapterLink(val seriesSlug: String, val chapterId: String, val number
  *     <root>/<series slug>/<chapter id>/assets.txt       the scripts, styles and fonts the page used
  *     <root>/_assets/<sha1 of address> + .meta           those files, shared by every chapter
  *     <root>/_walks/<id>.properties                      series downloads still in progress
+ *     <root>/_queue.properties                           chapters waiting to be downloaded, in order
  *
  * With the page, its files and its answers on disk, the site's own reader runs offline (see
  * [OfflineServer]). Plain files and [Properties], so it works (and is tested) without Android.
@@ -216,6 +217,25 @@ class DownloadStore(val root: File) {
         File(walksDir, safe(id) + ".properties").delete()
     }
 
+    // --- Chapters waiting to be downloaded -----------------------------------------------------
+
+    /** Replaces the saved queue with [entries] (one map per chapter, in order). */
+    fun writeQueue(entries: List<Map<String, String>>) {
+        root.mkdirs()
+        val p = Properties()
+        p.setProperty("count", entries.size.toString())
+        entries.forEachIndexed { i, e -> e.forEach { (k, v) -> p.setProperty("$i.$k", v) } }
+        writeProps(File(root, QUEUE_FILE), p)
+    }
+
+    fun queue(): List<Map<String, String>> {
+        val p = readProps(File(root, QUEUE_FILE))
+        val n = p.getProperty("count")?.toIntOrNull() ?: return emptyList()
+        return (0 until n).map { i ->
+            p.stringPropertyNames().filter { it.startsWith("$i.") }.associate { it.removePrefix("$i.") to p.getProperty(it) }
+        }.filter { it.isNotEmpty() }
+    }
+
     /** The page files present, in page order (complete files only, not ones still downloading). */
     fun pageFiles(link: ChapterLink): List<File> =
         (chapterDir(link).listFiles() ?: emptyArray()).filter { it.isFile && PAGE_FILE.matches(it.name) }.sortedBy { it.name }
@@ -281,6 +301,7 @@ class DownloadStore(val root: File) {
         /** Not a series: series folders are named by slugs, which start with a letter or digit. */
         private const val ASSETS_DIR = "_assets"
         private const val WALKS_DIR = "_walks"
+        private const val QUEUE_FILE = "_queue.properties"
         private val SAFE = Regex("^[A-Za-z0-9._-]{1,200}$")
         private val PAGE_FILE = Regex("^\\d{3,}\\.[a-z0-9]{1,5}$")
 
