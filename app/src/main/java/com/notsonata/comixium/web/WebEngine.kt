@@ -36,7 +36,10 @@ class WebEngine(private val app: Application) {
     }
 
     /** Whether the phone is online, for downloads and for answering pages from them. */
-    val connectivity = Connectivity(app)
+    val connectivity = Connectivity(app).also {
+        // Pages hide the site's "Http Error" messages while offline.
+        it.onChange = { pushPagePrefs() }
+    }
 
     val downloadPrefs = DownloadPrefs(prefs)
 
@@ -129,7 +132,8 @@ class WebEngine(private val app: Application) {
 
     /** All options the page script applies, as one setPrefs call. */
     fun pagePrefsCall(): String =
-        "window.__comixium && window.__comixium.setPrefs({${reader.pageScriptFields()},${appPrefs.pageScriptFields()}})"
+        "window.__comixium && (window.__comixium.setPrefs({${reader.pageScriptFields()},${appPrefs.pageScriptFields()}})," +
+            " window.__comixium.setOffline && window.__comixium.setOffline(${!connectivity.online}))"
 
     /** The tab currently on screen (null on native-only screens); used for hardware keys. */
     var activeTab: WebTab? = null

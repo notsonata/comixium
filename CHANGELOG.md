@@ -10,7 +10,9 @@ Downloads:
 - Download many chapters from a series page's Download button (solid, beside Read): unread (from where you left off), all, or from a chapter number; up to the latest, 5, 10, 25 or any number
 - A series download lists each chapter as waiting as soon as it's found (a few seconds each), in More → Downloads and on the series page, without waiting for earlier ones to download
 - Pick scanlators in order of preference: each chapter is downloaded once, from the first picked group that has it, so duplicate listings from several groups don't multiply the download
-- Downloaded chapters open in the usual reader, with the same controls, settings and comments, with or without a connection
+- Downloaded chapters open in the usual reader, with the same controls, settings and comments, with or without a connection, also when the connection drops while Comixium is open
+- Signed in, the reader's progress bar follows along in downloaded chapters read offline, and the reading progress reaches your comix account the next time it's online
+- No "Http Error" messages while offline
 - Comments are saved with each chapter (Download comments, on by default), also for accounts that load comments only on request
 - Library has a Downloaded section beside the site's library: downloads by series, with sizes and delete per chapter, per series or all; the offline screen links to it
 - More → Downloads shows what's downloading and the download settings: delete chapters once read to the end, download comments, only on Wi-Fi

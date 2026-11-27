@@ -888,6 +888,26 @@
   });
   window.addEventListener('popstate', schedule);
 
+  // --- Offline: the site says "Http Error" for every request that gets no answer --------------
+  // Signed in, a downloaded chapter read offline asks the account API over and over (state,
+  // follows, progress), each failure a toast. While the app (or the browser) says the phone is
+  // offline, those toasts are hidden; the site keeps the reading progress and sends it once online.
+  var appOffline = false;
+  var NET_ERROR = /^\s*http error\s*$/i;
+  function markToast(t) {
+    var text = t.querySelector('.toast__text');
+    if (text && NET_ERROR.test(text.textContent || '')) t.classList.add('cx-net-error');
+  }
+  function markToasts(n) {
+    if (n.matches('.toast')) markToast(n);
+    else if (n.querySelector('.toast')) [].forEach.call(n.querySelectorAll('.toast'), markToast);
+  }
+  function applyOffline() {
+    setAttr(document.documentElement, 'data-cx-offline', appOffline || navigator.onLine === false ? '' : null);
+  }
+  window.addEventListener('online', applyOffline);
+  window.addEventListener('offline', applyOffline);
+
   // Popunder links and dialogs are added anywhere in the tree; theme/reader flags live on <html>/<body>.
   var attrObserver = new MutationObserver(function (records) {
     for (var i = 0; i < records.length; i++) if (records[i].target === document.documentElement) themeCache = null;
@@ -899,6 +919,7 @@
     if (root && root !== watchedRoot) {
       watchedRoot = root;
       applyControls();
+      applyOffline();
       attrObserver.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-tone', 'style'] });
       addStyle();
     }
@@ -917,6 +938,7 @@
         if (n.tagName === 'A' && isTrap(n)) zap(n);
         else if (n.tagName === 'HTML' || n.tagName === 'HEAD' || n.tagName === 'BODY') watchRoots();
         else if (n.matches(OVERLAYS) || n.querySelector(OVERLAYS)) urgent = true;
+        else markToasts(n);
       }
       var removed = records[i].removedNodes;
       for (var k = 0; k < removed.length && !urgent; k++) {
@@ -1005,6 +1027,11 @@
       homeBlocks();
       readerSettingsSections();
       fitSeriesHeader();
+      return true;
+    },
+    setOffline: function (on) {
+      appOffline = !!on;
+      applyOffline();
       return true;
     },
     setDownloads: function (map) {

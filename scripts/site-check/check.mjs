@@ -295,6 +295,42 @@ try {
       check("A saved chapter opens offline in the site's reader", shown && hits > 0, `${shown || 0} pages shown, ${hits} images from the saved list`, 'offline reading');
       check('Reader controls on the offline chapter', await until(() => op.$('.rpage-floatctl__col .cx-dl-reader'), 6000), '', 'offline reading (same reader UI)');
       await oc.close();
+
+      // Signed in, the reader tracks the page you're on only once the account's state for the chapter
+      // answers; offline the app answers it with a blank one (OfflineServer.BLANK_STATE), tells the
+      // page it's offline, and the page script hides the site's "Http Error" toasts. A made-up user
+      // in local storage is enough for the site to act signed in; nothing reaches an account.
+      const sc = await browser.newContext({ userAgent: UA, viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+      await sc.addInitScript({ content: `try { localStorage.getItem('auth') || localStorage.setItem('auth', JSON.stringify({ state: { user: { id: 1, hashId: 'check', username: 'check', displayName: 'check' } }, version: 0 })); } catch (e) {}` });
+      await sc.addInitScript({ content: 'window.ComixiumNative={postMessage:function(){}};' + pageScript +
+        ';window.__toasts=[];new MutationObserver(function(){document.querySelectorAll(".toast__text").forEach(function(t){if(t.__seen)return;t.__seen=1;' +
+        'setTimeout(function(){var b=t.closest(".toast");window.__toasts.push({text:t.textContent,shown:!!b&&getComputedStyle(b).display!=="none"});},0);});}).observe(document,{subtree:true,childList:true});' +
+        'document.addEventListener("DOMContentLoaded",function(){window.__comixium.setOffline(true);});' });
+      let stateAsked = 0;
+      await sc.route('**/*', r => {
+        const q = r.request(), u = new URL(q.url());
+        if (u.pathname.startsWith('/hi/')) return images.has(u.pathname) ? r.fulfill({ status: 200, contentType: 'image/png', body: pixel }) : r.abort('internetdisconnected');
+        if (q.isNavigationRequest()) return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: doc.html });
+        const asset = assets.get(key(u));
+        if (asset) return r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: asset.ct, body: Buffer.from(asset.data, 'base64') });
+        if (/\/api\/v1\/chapters\/\d+/.test(u.pathname)) return r.fulfill({ status: 200, headers: { 'x-enc': chapterAnswer.enc }, contentType: chapterAnswer.type, body: chapterAnswer.body });
+        if (/^\/api\/v1\/user\/chapters\/\d+\/state$/.test(u.pathname) && q.method() === 'GET') { stateAsked++; return r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"ok","result":{"liked":false}}' }); }
+        return r.abort('internetdisconnected');
+      });
+      const sp = await sc.newPage();
+      await sp.goto(BASE + saveHref, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+      await until(() => sp.evaluate(() => document.querySelectorAll('.rpage-page img[src^="http"]').length || null), 15000);
+      await sp.mouse.move(200, 400);
+      const segs = () => sp.evaluate(() => { const s = [...document.querySelectorAll('.rpage-progress__seg')]; return { total: s.length, at: s.findIndex(x => x.classList.contains('is-active')) }; });
+      for (let i = 0; i < 80 && (await segs()).at < (await segs()).total - 1; i++) { await sp.mouse.wheel(0, 3000); await wait(120); }
+      const bar = await segs();
+      check('Signed in and offline, the reader tracks the page once its account state answers (`/api/v1/user/chapters/<id>/state`)',
+        stateAsked > 0 && bar.total > 1 && bar.at === bar.total - 1, `state asked ${stateAsked}x, at page ${bar.at + 1} of ${bar.total}`, 'reading progress in downloaded chapters offline');
+      const toasts = await sp.evaluate(() => window.__toasts || []);
+      const netErrors = toasts.filter(t => /^\s*http error\s*$/i.test(t.text));
+      check('"Http Error" toasts hidden while offline', netErrors.length > 0 && netErrors.every(t => !t.shown),
+        `${netErrors.length} "Http Error", ${netErrors.filter(t => t.shown).length} shown; others: ${toasts.filter(t => !netErrors.includes(t)).map(t => t.text).join(', ') || 'none'}`, 'no Http Error messages offline');
+      await sc.close();
     }
 
   }

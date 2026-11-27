@@ -79,6 +79,22 @@ class OfflineServerTest {
         assertNull(server.lookup("https://comix.ws/api/v1/user", "GET", false, offline))
     }
 
+    @Test fun offlineTheReaderGetsABlankAccountStateForADownloadedChapter() {
+        // Signed in, the site's reader only tracks the page you're on once this answer comes.
+        val state = "https://comix.ws/api/v1/user/chapters/11578620/state"
+        assertNull(server.lookup(state, "GET", false, online))
+        assertNull(server.lookup(state, "GET", false, online.copy(replaying = true)))
+        val s = server.lookup(state, "GET", false, offline)!!
+        assertEquals("application/json", s.type)
+        assertEquals("{\"status\":\"ok\",\"result\":{\"liked\":false}}", s.open()!!.reader().readText())
+        // Only for chapters that can be read offline, and only reading it.
+        assertNull(server.lookup("https://comix.ws/api/v1/user/chapters/2/state", "GET", false, offline))
+        assertNull(server.lookup(state, "POST", false, offline))
+        assertNull(server.lookup("https://evil.example/api/v1/user/chapters/11578620/state", "GET", false, offline))
+        assertTrue(server.hasChapter("11578620"))
+        assertEquals("11578620", OfflineServer.chapterIdOfState(state + "?_=1"))
+    }
+
     @Test fun answerKeysMatchThePageAddressOnEitherDomain() {
         assertEquals(
             OfflineServer.answerKey("https://comix.ws/api/v1/threads/lookup?page_identifier=chapter-9&page_url=https%3A%2F%2Fcomix.ws%2Ftitle%2Fs%2F9-chapter-3&_=5"),
