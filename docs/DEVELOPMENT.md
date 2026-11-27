@@ -59,6 +59,20 @@ work, and save enough of the page that the same reader runs offline
    offline (keyed with the chapter's `page_url` reduced to its path, so either domain matches). The app's page script runs on it as on any chapter, so the reader UI is the same.
    Offline, the reader's chapter list is empty (paged API, not saved); Prev/Next work between
    downloaded chapters.
+   Signed in, the reader tracks the page you're on (the progress bar, and the reading progress it
+   queues in `reader.progress.queue` and sends to `/api/v1/user/manga/<id>/progress`) only once
+   `/api/v1/user/chapters/<id>/state` has answered; offline that answer is a blank state
+   (`{"result":{"liked":false}}`), so tracking starts, and the queue is sent on a later online load.
+
+**Offline** (`Connectivity`): Android's network callbacks give the state (asking
+`ConnectivityManager` again from inside a callback can return the network that's going away). A
+validated connection can still have no internet for a while (a Wi-Fi with none, until Android checks
+again), so a site request that fails with no connection (`onReceivedError`: host lookup, connect,
+timeout) also counts as offline for 20 s and asks Android to check again
+(`reportNetworkConnectivity`); a new or returning connection is tried at once. When that failure is
+a downloaded chapter's page, chapter data or account state, the tab opens it again from disk, once.
+Pages get the state with their settings (`setOffline`); while offline the page script hides the
+site's "Http Error" toasts (its API layer shows one for every request without an answer).
 
 **Series downloads** (`SeriesWalk`): the series' chapter list is paged, and the site flags fast
 paging without taps, so a series download never pages it. It walks one number at a time: the series

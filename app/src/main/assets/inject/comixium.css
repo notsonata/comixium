@@ -698,3 +698,6 @@ html[data-cx-mobile] .mpage__badges {
   background: var(--accent-2, var(--accent));
   color: var(--accent-ink);
 }
+
+/* The site's "Http Error" toasts while offline (see applyOffline in comixium.js). */
+html[data-cx-offline] .toast.cx-net-error { display: none !important; }

@@ -80,6 +80,8 @@ class WebTab(
     private val contextWrapper = MutableContextWrapper(null)
     /** The page on screen came from a download (so its chapter data must too: it matches that page's scripts). */
     @Volatile private var replaying = false
+    /** The downloaded chapter this tab last reopened from the phone (see [reopenOffline]), so it happens once. */
+    private var reopened: String? = null
     private var created = false
     private var clearHistoryOnLoad = false
     /** Path requested before the views existed (e.g. a More-screen link); loaded on attach. */
@@ -416,7 +418,7 @@ class WebTab(
             val served = runCatching { engine.downloads.server.lookup(target, request.method, request.isForMainFrame, mode) }.getOrNull()
             if (request.isForMainFrame) replaying = served?.isPage == true
             if (served != null) {
-                val stream = runCatching { java.io.FileInputStream(served.file) }.getOrNull()
+                val stream = served.open()
                 if (stream != null) {
                     val mime = served.type.substringBefore(';').trim()
                     val charset = Regex("charset=([^;]+)", RegexOption.IGNORE_CASE).find(served.type)?.groupValues?.get(1)?.trim()
@@ -448,16 +450,25 @@ class WebTab(
 
         override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
             this@WebTab.url = url
+            if (reopened != null && ChapterLink.parse(Site.pathOnly(url))?.path != reopened) reopened = null
             canGoBack = backTarget() >= 0
             isReader = Site.isReaderUrl(url)
             engine.onTabUrl()
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, err: WebResourceErrorCompat) {
-            if (!request.isForMainFrame) return
             val failedUrl = request.url.toString()
             val code = if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_RESOURCE_ERROR_GET_CODE)) err.errorCode else ERROR_UNKNOWN
             val desc = if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_RESOURCE_ERROR_GET_DESCRIPTION)) err.description.toString() else ""
+            if (Site.isSiteUrl(failedUrl) && (code in NO_CONNECTION || "INTERNET_DISCONNECTED" in desc)) {
+                engine.connectivity.noteUnreachable()
+                if (request.isForMainFrame) {
+                    if (reopenPage(failedUrl)) return
+                } else {
+                    reopenOffline(failedUrl)
+                }
+            }
+            if (!request.isForMainFrame) return
             if (code in UNREACHABLE && tryFallback(view, failedUrl)) return
             error = WebError(failedUrl, code, desc)
             loading = false
@@ -473,6 +484,30 @@ class WebTab(
                 if (tryFallback(view, failedUrl)) return
                 error = WebError(failedUrl, status, response.reasonPhrase ?: "HTTP $status", isHttp = true)
             }
+        }
+
+        /**
+         * The connection dropped while the app thought it was online, and a downloaded chapter on screen
+         * couldn't get its data or the account's state for it: open it again, from the phone this time
+         * (the failure counts as offline for a while, see [com.notsonata.comixium.offline.Connectivity]).
+         */
+        private fun reopenOffline(failedUrl: String) {
+            val id = OfflineServer.chapterIdOfApi(failedUrl) ?: OfflineServer.chapterIdOfState(failedUrl) ?: return
+            main.post {
+                val here = ChapterLink.parse(Site.pathOnly(url)) ?: return@post
+                if (here.chapterId != id || !engine.downloads.server.hasChapter(id) || reopened == here.path) return@post
+                reopened = here.path
+                webView.reload()
+            }
+        }
+
+        /** The same for a downloaded chapter's page itself (rather than trying the other domain). */
+        private fun reopenPage(failedUrl: String): Boolean {
+            val link = ChapterLink.parse(Site.pathOnly(failedUrl)) ?: return false
+            if (!engine.downloads.server.hasChapter(link.chapterId) || reopened == link.path) return false
+            reopened = link.path
+            main.post { webView.loadUrl(failedUrl) }
+            return true
         }
 
         private fun tryFallback(view: WebView, failedUrl: String): Boolean {
@@ -507,6 +542,12 @@ class WebTab(
 
     companion object {
         private const val ERROR_UNKNOWN = -1
+        /** Errors that mean no connection (no route, no DNS answer, nothing answering). */
+        private val NO_CONNECTION = setOf(
+            WebViewClient.ERROR_HOST_LOOKUP,
+            WebViewClient.ERROR_CONNECT,
+            WebViewClient.ERROR_TIMEOUT,
+        )
         val UNREACHABLE = setOf(
             WebViewClient.ERROR_HOST_LOOKUP,
             WebViewClient.ERROR_CONNECT,

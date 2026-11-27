@@ -12,14 +12,26 @@ import java.io.File
  *  - its chapter data: from disk on a page that came from disk (it has to match that page's
  *    scripts), or when offline
  *  - its comments: from disk when offline (online, the live ones are newer)
+ *  - the account's state for it (liked, where you left off): when offline, a blank one. Signed in,
+ *    the site's reader waits for that answer before it tracks the page you're on, and the reading
+ *    progress it keeps (queued in the page, sent once online) depends on that
  *
  * The lookup is plain Kotlin and unit-tested; [com.notsonata.comixium.web.WebTab] turns a [Served]
  * into the WebView's response. Lookups run on WebView threads, so the index is an immutable snapshot.
  */
 class OfflineServer {
 
-    /** What to send back: a file, its type, extra headers, and whether it's a chapter page. */
-    data class Served(val file: File, val type: String, val headers: Map<String, String> = emptyMap(), val isPage: Boolean = false)
+    /** What to send back: a file (or [bytes]), its type, extra headers, and whether it's a chapter page. */
+    data class Served(
+        val file: File?,
+        val type: String,
+        val headers: Map<String, String> = emptyMap(),
+        val isPage: Boolean = false,
+        val bytes: ByteArray? = null,
+    ) {
+        fun open(): java.io.InputStream? =
+            bytes?.let { java.io.ByteArrayInputStream(it) } ?: file?.let { runCatching { java.io.FileInputStream(it) }.getOrNull() }
+    }
 
     /** How the asking WebView is doing: [preferOffline] for the Downloaded reader, [replaying] if its page came from disk. */
     data class Mode(val online: Boolean, val preferOffline: Boolean = false, val replaying: Boolean = false)
@@ -83,18 +95,29 @@ class OfflineServer {
         }
         if (!mode.online) {
             answerKey(url)?.let { key -> ix.answers[key]?.let { return Served(it.file, it.type.ifBlank { "application/json" }, CORS) } }
+            chapterIdOfState(url)?.takeIf { it in ix.chapters }?.let { return Served(null, "application/json", CORS, bytes = BLANK_STATE) }
         }
         return null
     }
 
+    /** Whether chapter [id]'s data is saved (it can be read offline). */
+    fun hasChapter(id: String): Boolean = id in index.chapters
+
     companion object {
         private val CORS = mapOf("Access-Control-Allow-Origin" to "*")
         private val CHAPTER_API = Regex("^/api/v1/chapters/(\\d+)/?$")
+        private val CHAPTER_STATE = Regex("^/api/v1/user/chapters/(\\d+)/state/?$")
+        /** The account's state for a chapter, as the site sends it, with nothing set. */
+        private val BLANK_STATE = "{\"status\":\"ok\",\"result\":{\"liked\":false}}".toByteArray()
         /** Query parameters that change on every request (anti-cache tokens), left out of [answerKey]. */
         private val VOLATILE = setOf("_", "v", "w")
 
         fun chapterIdOfApi(url: String): String? =
             if (Site.isSiteUrl(url)) CHAPTER_API.matchEntire(Site.pathOnly(url))?.groupValues?.get(1) else null
+
+        /** The chapter whose account state (liked, last page) [url] asks for. */
+        fun chapterIdOfState(url: String): String? =
+            if (Site.isSiteUrl(url)) CHAPTER_STATE.matchEntire(Site.pathOnly(url))?.groupValues?.get(1) else null
 
         /**
          * Saved answers other than chapter data: the comment threads. Key = path + sorted stable query,
