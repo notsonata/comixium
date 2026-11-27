@@ -36,7 +36,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * The download queue. Each chapter is first prepared by [PageCollector] (needs the app on screen):
  * its page addresses, plus the page, files and answers the site's reader needs offline. Its images
  * then download in the background ([PageFetcher], three at a time across chapters) while the next
- * chapter is prepared. Series downloads ([SeriesWalk]) add their chapters one at a time.
+ * chapter is prepared. Series downloads ([SeriesWalk]) look their chapters up in a second hidden
+ * page, alongside, and queue each one as soon as it's found.
  * Unfinished work stays on disk and is picked up again on the next launch.
  * Main thread, except the file and network work.
  */
@@ -55,9 +56,17 @@ class ChapterDownloads(
         val label: String = "",
         val group: String = "",
         val coverUrl: String = "",
-        /** The series download that added it, if any. */
-        val walkId: String? = null,
-    )
+    ) {
+        fun toMap(): Map<String, String> =
+            mapOf("path" to link.path, "series" to seriesTitle, "label" to label, "group" to group, "cover" to coverUrl)
+
+        companion object {
+            fun fromMap(m: Map<String, String>, domain: String): Request? {
+                val link = ChapterLink.parse(m["path"]) ?: return null
+                return Request(link, domain, m["series"].orEmpty(), m["label"].orEmpty(), m["group"].orEmpty(), m["cover"].orEmpty())
+            }
+        }
+    }
 
     sealed interface State {
         data object Queued : State
@@ -76,7 +85,16 @@ class ChapterDownloads(
     /** Serves downloaded chapters to the app's WebViews. */
     val server = OfflineServer()
 
-    val collector = PageCollector(app, adBlocker, app.assets.open("inject/collect.js").bufferedReader().use { it.readText() })
+    private val collectScript = app.assets.open("inject/collect.js").bufferedReader().use { it.readText() }
+
+    /** Prepares chapters. */
+    val collector = PageCollector(app, adBlocker, collectScript)
+
+    /** Looks chapters up for series downloads, so finding them doesn't wait on preparing others. */
+    val finder = PageCollector(app, adBlocker, collectScript)
+
+    /** Both hidden pages: the UI keeps them drawn, under its screens. */
+    val collectors: List<PageCollector> get() = listOf(collector, finder)
 
     /** Chapters waiting, being prepared, downloading or failed (finished ones are in [store]). */
     val queue = mutableStateListOf<Item>()
@@ -105,54 +123,65 @@ class ChapterDownloads(
 
     private val foreground = MutableStateFlow(false)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    /** Wakes the worker: something was added, retried or allowed again. */
+    /** Wake the workers: something was added, retried or allowed again. */
     private val wake = Channel<Unit>(Channel.CONFLATED)
+    private val walkWake = Channel<Unit>(Channel.CONFLATED)
+    /** The latest queue to write to disk (written in order, one at a time). */
+    private val queueWrites = Channel<List<Map<String, String>>>(Channel.CONFLATED)
     private var current: Item? = null
     private var currentJob: Job? = null
+    private var currentWalk: String? = null
+    private var walkJob: Job? = null
     private val fetches = HashMap<ChapterLink, Job>()
     private val pageGate = Semaphore(PARALLEL)
     private val userAgent by lazy { runCatching { WebSettings.getDefaultUserAgent(app) }.getOrDefault("Mozilla/5.0 (Linux; Android)") }
 
     init {
         scope.launch {
-            val (all, saved) = withContext(Dispatchers.IO) {
-                runCatching { store.allChapters() }.getOrDefault(emptyList()) to runCatching { store.walks() }.getOrDefault(emptyList())
+            val (all, saved, waiting) = withContext(Dispatchers.IO) {
+                Triple(
+                    runCatching { store.allChapters() }.getOrDefault(emptyList()),
+                    runCatching { store.walks() }.getOrDefault(emptyList()),
+                    runCatching { store.queue() }.getOrDefault(emptyList()),
+                )
             }
             complete += all.filter { it.complete }.map { it.link }
             withContext(Dispatchers.IO) {
                 runCatching { knownAssets += store.assets().map { it.url } }
                 runCatching { server.rebuild(store) }
             }
-            // Unfinished chapters go back in the queue, and so do chapters saved before the page was
-            // (the first 1.9.0 build): preparing them again adds what the site's reader needs, keeping the images.
+            // The queue as it was, then anything unfinished it doesn't have, and chapters saved before
+            // the page was (the first 1.9.0 build): preparing them again adds what the site's reader
+            // needs, keeping the images.
+            val recorded = all.filter { it.complete && it.recorded }.map { it.link }.toSet()
+            waiting.mapNotNull { Request.fromMap(it, domain()) }.forEach { r ->
+                if (r.link !in recorded && queue.none { it.request.link == r.link }) queue += Item(r)
+            }
             all.filter { !it.complete || !it.recorded }.forEach { ch ->
                 if (queue.none { it.request.link == ch.link }) {
                     queue += Item(Request(ch.link, domain(), store.seriesTitle(ch.link.seriesSlug).orEmpty(), ch.label, ch.group))
                 }
             }
             saved.mapNotNull(SeriesWalk::fromMap).filter { !it.isDone }.forEach { w ->
-                if (walks.any { it.id == w.id }) return@forEach
-                walks += w
-                // The chapter it was waiting for goes back in line as part of it (or is queued again
-                // if the app closed before it was saved at all).
-                val link = (w.step as? SeriesWalk.Step.Wait)?.link ?: return@forEach
-                if (link in complete && all.firstOrNull { it.link == link }?.recorded == true) return@forEach
-                val i = queue.indexOfFirst { it.request.link == link }
-                val r = Request(link, domain(), w.seriesTitle, "Ch.${link.number}", w.lastGroup, w.coverUrl, walkId = w.id)
-                if (i >= 0) queue[i] = Item(queue[i].request.copy(walkId = w.id)) else queue += Item(r)
+                if (walks.none { it.id == w.id }) walks += w
+            }
+            // Only now that the saved queue is read may it be written (the latest version wins).
+            scope.launch(Dispatchers.IO) {
+                for (q in queueWrites) runCatching { store.writeQueue(q) }
             }
             changed()
-            scope.launch { work() }
+            scope.launch { prepareLoop() }
+            scope.launch { walkLoop() }
         }
         scope.launch {
-            net.net.collect { wake.trySend(Unit) }
+            net.net.collect { poke() }
         }
     }
 
     /** The app is on screen (true) or left it (false): chapters can only be prepared while it's on. */
     fun setForeground(on: Boolean) {
         foreground.value = on
-        if (!on) collector.interrupt() else wake.trySend(Unit)
+        if (!on) collectors.forEach { it.interrupt() } else poke()
     }
 
     fun enqueue(r: Request) {
@@ -176,7 +205,6 @@ class ChapterDownloads(
             collector.interrupt()
         }
         fetches.remove(link)?.cancel()
-        item.request.walkId?.let { id -> updateWalk(id) { w -> if (w.step == SeriesWalk.Step.Wait(link)) w.copy(step = SeriesWalk.Step.Peek(link.path)) else w } }
         scope.launch {
             if (link !in complete) withContext(Dispatchers.IO) { runCatching { store.deleteChapter(link) } }
             changed()
@@ -246,6 +274,10 @@ class ChapterDownloads(
     /** Stops a series download; chapters it already queued carry on. */
     fun cancelWalk(w: SeriesWalk) {
         walks.removeAll { it.id == w.id }
+        if (currentWalk == w.id) {
+            walkJob?.cancel()
+            finder.interrupt()
+        }
         scope.launch(Dispatchers.IO) { runCatching { store.deleteWalk(w.id) } }
         changed()
     }
@@ -271,17 +303,21 @@ class ChapterDownloads(
 
     // --- For pages and screens ----------------------------------------------------------------
 
-    /** Download states of a series' chapters for the page script: id -> done/queued/preparing/active:NN/failed. */
+    /**
+     * Download states of a series' chapters for the page script: id -> done/queued/preparing/active:NN/failed
+     * ("preparing" only until the chapter's pages are counted; after that it's progress like the list's).
+     */
     fun pageStates(seriesSlug: String): Map<String, String> {
         val out = linkedMapOf<String, String>()
         complete.filter { it.seriesSlug == seriesSlug }.forEach { out[it.chapterId] = "done" }
         queue.filter { it.request.link.seriesSlug == seriesSlug }.forEach { item ->
             if (item.request.link in complete) return@forEach
-            out[item.request.link.chapterId] = when (val s = item.state) {
-                State.Queued -> "queued"
-                is State.Preparing -> "preparing"
-                is State.Fetching -> "active:" + (if (s.total > 0) 100 * s.done / s.total else 0)
-                is State.Failed -> "failed"
+            val s = item.state
+            out[item.request.link.chapterId] = when {
+                s == State.Queued -> "queued"
+                s is State.Failed -> "failed"
+                s is State.Preparing && s.total == 0 -> "preparing"
+                else -> "active:" + (100 * (progressOf(s) ?: 0f)).toInt()
             }
         }
         return out
@@ -294,7 +330,14 @@ class ChapterDownloads(
     private fun changed() {
         version++
         onChange?.invoke()
+        queueWrites.trySend(queue.map { it.request.toMap() })
+        refreshWaiting()
+        poke()
+    }
+
+    private fun poke() {
         wake.trySend(Unit)
+        walkWake.trySend(Unit)
     }
 
     /** Files on disk changed: re-read them for the WebViews, then tell the screens. */
@@ -305,30 +348,13 @@ class ChapterDownloads(
 
     // --- The worker -----------------------------------------------------------------------------
 
-    private suspend fun work() {
+    /** Prepares queued chapters, one at a time. */
+    private suspend fun prepareLoop() {
         while (true) {
-            val next: Any? = queue.firstOrNull { it.state == State.Queued }
-                ?: walks.firstOrNull { it.problem.isEmpty() && it.step !is SeriesWalk.Step.Wait && !it.isDone }
-            if (next == null) {
-                waitingFor = null
-                // Nothing to prepare: free the hidden WebView after a while, unless work turns up.
-                if (withTimeoutOrNull(IDLE_RELEASE_MS) { wake.receive() } == null) {
-                    collector.release()
-                    wake.receive()
-                }
-                continue
-            }
-            if (!ready()) {
-                wake.receive()
-                continue
-            }
-            waitingFor = null
-            val job = scope.launch {
-                when (next) {
-                    is Item -> { current = next; prepare(next) }
-                    is SeriesWalk -> step(next)
-                }
-            }
+            val next = queue.firstOrNull { it.state == State.Queued }
+            if (!await(next != null, wake, collector)) continue
+            current = next
+            val job = scope.launch { prepare(next!!) }
             currentJob = job
             job.join()
             current = null
@@ -336,16 +362,49 @@ class ChapterDownloads(
         }
     }
 
-    /** Online, allowed to use this connection, and on screen; otherwise says what it's waiting for. */
-    private fun ready(): Boolean {
+    /** Runs series downloads' look-ups, one step at a time, alongside [prepareLoop]. */
+    private suspend fun walkLoop() {
+        while (true) {
+            val next = walks.firstOrNull { it.problem.isEmpty() && !it.isDone }
+            if (!await(next != null, walkWake, finder)) continue
+            currentWalk = next!!.id
+            val job = scope.launch { step(next) }
+            walkJob = job
+            job.join()
+            currentWalk = null
+            walkJob = null
+        }
+    }
+
+    /**
+     * Whether a worker can go ahead: it has work and the app is [ready]. Otherwise waits for a change
+     * (freeing [pc]'s WebView after a while with nothing to do) and says false, so the worker looks again.
+     */
+    private suspend fun await(hasWork: Boolean, signal: Channel<Unit>, pc: PageCollector): Boolean {
+        if (hasWork && ready()) return true
+        if (hasWork || withTimeoutOrNull(IDLE_RELEASE_MS) { signal.receive() } != null) {
+            if (hasWork) signal.receive()
+            return false
+        }
+        pc.release()
+        signal.receive()
+        return false
+    }
+
+    /** Online, allowed to use this connection, and on screen. */
+    private fun ready(): Boolean = refreshWaiting() == null
+
+    /** Why nothing can be prepared right now, or null; kept in [waitingFor] while there's work. */
+    private fun refreshWaiting(): String? {
         val n = net.net.value
-        waitingFor = when {
+        val why = when {
             !n.online -> "Waiting for a connection"
             prefs.wifiOnly && !n.unmetered -> "Waiting for Wi-Fi"
             !foreground.value -> "Paused while Comixium is in the background"
             else -> null
         }
-        return waitingFor == null
+        waitingFor = why.takeIf { queue.isNotEmpty() || walks.isNotEmpty() }
+        return why
     }
 
     private suspend fun prepare(item: Item) {
@@ -372,12 +431,6 @@ class ChapterDownloads(
                     item.state = State.Failed("Couldn't save the chapter. Check the free space, then retry")
                     changed()
                     return
-                }
-                r.walkId?.let { id ->
-                    updateWalk(id) { w ->
-                        if (w.step != SeriesWalk.Step.Wait(r.link)) w
-                        else w.copy(seen = w.seen + result.number.ifBlank { r.link.number }, lastGroup = result.group.ifBlank { w.lastGroup }).advance(result.next)
-                    }
                 }
                 item.state = State.Fetching(0, result.urls.size)
                 changed()
@@ -465,7 +518,7 @@ class ChapterDownloads(
     private suspend fun step(w: SeriesWalk) {
         val seriesUrl = Site.url(domain(), "/title/${w.seriesSlug}")
         when (val s = w.step) {
-            SeriesWalk.Step.First -> when (val r = collector.collect(seriesUrl, PageCollector.Job("first"))) {
+            SeriesWalk.Step.First -> when (val r = finder.collect(seriesUrl, PageCollector.Job("first"))) {
                 is PageCollector.Result.Rows -> {
                     val n = SeriesWalk.firstNumber(r.rows)
                     if (n == null) updateWalk(w.id) { it.copy(step = SeriesWalk.Step.Done, problem = "No chapters found") }
@@ -473,15 +526,15 @@ class ChapterDownloads(
                 }
                 else -> stepFailed(w, r)
             }
-            is SeriesWalk.Step.Find -> when (val r = collector.collect(seriesUrl, PageCollector.Job("find", number = s.number))) {
+            is SeriesWalk.Step.Find -> when (val r = finder.collect(seriesUrl, PageCollector.Job("find", number = s.number))) {
                 is PageCollector.Result.Rows -> choose(w, r.rows, s.number)
                 else -> stepFailed(w, r)
             }
-            is SeriesWalk.Step.Peek -> when (val r = collector.collect(Site.url(domain(), s.path), PageCollector.Job("peek"))) {
+            is SeriesWalk.Step.Peek -> when (val r = finder.collect(Site.url(domain(), s.path), PageCollector.Job("peek"))) {
                 is PageCollector.Result.Info -> updateWalk(w.id) { it.copy(seen = it.seen + r.number).advance(r.next) }
                 else -> stepFailed(w, r)
             }
-            is SeriesWalk.Step.Wait, SeriesWalk.Step.Done -> Unit
+            SeriesWalk.Step.Done -> Unit
         }
     }
 
@@ -493,6 +546,7 @@ class ChapterDownloads(
     }
 
     private fun choose(w: SeriesWalk, rows: List<SeriesWalk.Row>, number: String) {
+        if (walks.none { it.id == w.id }) return // stopped meanwhile
         when (val c = w.choose(rows, number)) {
             SeriesWalk.Choice.Missing -> updateWalk(w.id) { it.copy(step = SeriesWalk.Step.Done, problem = if (it.saved == 0) "Ch.$number isn't listed" else "") }
             is SeriesWalk.Choice.Skip -> updateWalk(w.id) { it.copy(step = SeriesWalk.Step.Peek(c.row.path)) }
@@ -506,8 +560,8 @@ class ChapterDownloads(
                     have != null && have.next.isNotBlank() -> updateWalk(w.id) { it.copy(seen = it.seen + number).advance(have.next) }
                     have != null || queued != null -> updateWalk(w.id) { it.copy(step = SeriesWalk.Step.Peek((have?.link ?: queued!!.request.link).path)) }
                     else -> {
-                        queue += Item(Request(link, domain(), w.seriesTitle, "Ch.$number", c.row.group, w.coverUrl, walkId = w.id))
-                        updateWalk(w.id) { it.copy(saved = it.saved + 1, lastGroup = c.row.group, step = SeriesWalk.Step.Wait(link)) }
+                        queue += Item(Request(link, domain(), w.seriesTitle, "Ch.$number", c.row.group, w.coverUrl))
+                        updateWalk(w.id) { it.queued(c.row) }
                     }
                 }
             }
@@ -537,6 +591,16 @@ class ChapterDownloads(
         fun splitTitle(title: String): Pair<String, String> {
             val i = title.lastIndexOf(" · ")
             return if (i <= 0) title.trim() to "" else title.substring(0, i).trim() to title.substring(i + 3).trim()
+        }
+
+        /**
+         * How far along a chapter is, 0..1, or null when it isn't moving: finding its pages is the
+         * first half (the slow part, in the hidden page), downloading their images the second.
+         */
+        fun progressOf(s: State): Float? = when (s) {
+            is State.Preparing -> if (s.total > 0) 0.5f * s.found / s.total else 0f
+            is State.Fetching -> 0.5f + 0.5f * s.done / s.total.coerceAtLeast(1)
+            else -> null
         }
 
         fun describe(why: String): String = when (why) {

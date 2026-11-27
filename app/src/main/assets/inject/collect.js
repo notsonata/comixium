@@ -243,12 +243,20 @@
       post({ type: 'failed', why: 'missing', found: done, total: total });
       return;
     }
-    // The comments load when the reader reaches the end of the chapter.
+    // The comments load when the reader reaches the end of the chapter, or, for accounts that turned
+    // off loading them automatically, once "Load comments" there is tapped.
     var extra = [];
     if (j.comments) {
-      window.scrollTo(0, document.documentElement.scrollHeight);
-      for (var c = 0; c < 80 && !requested(/\/api\/v1\/threads\/\d+\/comments/).length; c++) {
-        if (c % 10 === 9) window.scrollTo(0, document.documentElement.scrollHeight);
+      var LOOKUP = /\/api\/v1\/threads\/lookup/, COMMENTS = /\/api\/v1\/threads\/\d+\/comments/;
+      var lookedUp = -1;
+      for (var c = 0; c < 300 && !requested(COMMENTS).length; c++) {
+        if (c % 10 === 0) window.scrollTo(0, document.documentElement.scrollHeight);
+        var load = document.querySelector('.rpage-load-comments button');
+        if (load && !load.disabled) load.click();
+        // A chapter nobody has commented on has no thread: the look-up comes back and nothing follows
+        // (requests are listed once they finish, so allow a slow connection time for the comments).
+        if (lookedUp < 0 && requested(LOOKUP).length) lookedUp = c;
+        if (lookedUp >= 0 && c - lookedUp > 80) break;
         await sleep(100);
       }
       await sleep(600);
@@ -261,7 +269,7 @@
     await waitFor('.rpage-chap-ending__meta', 3000);
     var info = readerInfo();
     var about = seriesInfo();
-    post({ type: 'progress', found: total, total: total, saving: true });
+    post({ type: 'progress', found: total, total: total });
 
     // The page itself, as the site sends it (its scripts set the reader up from it).
     var html = '';

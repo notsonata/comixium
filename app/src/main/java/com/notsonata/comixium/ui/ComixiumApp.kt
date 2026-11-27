@@ -74,11 +74,14 @@ private val BACK_EASING = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
 @Composable
 fun ComixiumApp(engine: WebEngine) {
     Box(Modifier.fillMaxSize()) {
-        // The page that prepares chapter downloads (see PageCollector): drawn, but under the app's screens.
-        AndroidView(
-            factory = { engine.downloads.collector.host.also { (it.parent as? ViewGroup)?.removeView(it) } },
-            modifier = Modifier.fillMaxSize(),
-        )
+        // The pages that prepare chapter downloads and look chapters up (see PageCollector): drawn,
+        // but under the app's screens.
+        engine.downloads.collectors.forEach { pc ->
+            AndroidView(
+                factory = { pc.host.also { (it.parent as? ViewGroup)?.removeView(it) } },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         AppContent(engine)
     }
 }

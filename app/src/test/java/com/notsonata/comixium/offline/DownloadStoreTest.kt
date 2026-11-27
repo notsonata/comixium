@@ -96,6 +96,21 @@ class DownloadStoreTest {
         assertTrue(store.walks().isEmpty())
     }
 
+    @Test fun keepsTheQueueInOrder() {
+        val store = DownloadStore(tmp.root)
+        assertTrue(store.queue().isEmpty())
+        val q = listOf(
+            mapOf("path" to "/title/s/2-chapter-1", "group" to "Asura Scans", "title" to "A = B: C"),
+            mapOf("path" to "/title/s/3-chapter-2", "group" to ""),
+        )
+        store.writeQueue(q)
+        assertEquals(q, store.queue())
+        // The queue file isn't a series.
+        assertTrue(store.series().isEmpty())
+        store.writeQueue(emptyList())
+        assertTrue(store.queue().isEmpty())
+    }
+
     @Test(expected = IllegalArgumentException::class) fun refusesUnsafeFolderNames() {
         DownloadStore(tmp.root).seriesDir("../outside")
     }

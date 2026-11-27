@@ -79,6 +79,17 @@ class OfflineServerTest {
         assertNull(server.lookup("https://comix.ws/api/v1/user", "GET", false, offline))
     }
 
+    @Test fun answerKeysMatchThePageAddressOnEitherDomain() {
+        assertEquals(
+            OfflineServer.answerKey("https://comix.ws/api/v1/threads/lookup?page_identifier=chapter-9&page_url=https%3A%2F%2Fcomix.ws%2Ftitle%2Fs%2F9-chapter-3&_=5"),
+            OfflineServer.answerKey("https://comix.to/api/v1/threads/lookup?page_url=https%3A%2F%2Fcomix.to%2Ftitle%2Fs%2F9-chapter-3&page_identifier=chapter-9&v=0&w=0"),
+        )
+        assertEquals(
+            "/api/v1/threads/lookup?page_identifier=chapter-9&page_url=/title/s/9-chapter-3",
+            OfflineServer.answerKey("https://comix.to/api/v1/threads/lookup?page_identifier=chapter-9&page_url=https%3A%2F%2Fcomix.to%2Ftitle%2Fs%2F9-chapter-3"),
+        )
+    }
+
     @Test fun answerKeysIgnoreVolatileParametersAndOrder() {
         assertEquals(
             OfflineServer.answerKey("https://comix.to/api/v1/threads/4/comments?sort=best&_=1"),

@@ -253,6 +253,10 @@ try {
 
     // An early chapter, so it has a next one.
     const saveHref = rows[0]?.path || chapterHref;
+    // Series downloads look at each chapter they queue, to learn the number after it.
+    const peek = await collect(saveHref, { mode: 'peek', have: [] });
+    checkData('A quick look at a chapter reads its number and the next one', peek.end && peek.end.type === 'info' && peek.end.number === '2' && parseFloat(peek.end.next) > 2,
+      peek.end ? JSON.stringify(peek.end) : 'no answer', 'series downloads (finding the next chapter)');
     const { end, msgs, flags } = await collect(saveHref, { mode: 'chapter', comments: true, have: [] });
     const ok = end && end.type === 'pages' && end.found === end.total && end.total > 0 && end.urls.every(u => /^https:\/\//.test(u));
     checkData('Every page image found by scrolling the reader', ok, end ? `${end.type} ${end.why || ''} ${end.found}/${end.total}` : 'no answer', 'downloads');
